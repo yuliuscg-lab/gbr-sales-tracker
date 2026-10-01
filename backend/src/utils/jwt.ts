@@ -1,19 +1,16 @@
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
 import { env } from "../config/env";
 import { AppError } from "../errors/AppError";
-import { Role } from "@prisma/client";
 
 interface TokenPayload extends JwtPayload {
     sub: string;
-    role: Role;
     type: "access" | "refresh";
     jti?: string;
 }
 
-export function generateAccessToken(userId:string, role: Role):string {
+export function generateAccessToken(userId:string):string {
     const payload:TokenPayload = {
         sub: userId,
-        role,
         type: "access",
     };
 
@@ -25,10 +22,9 @@ export function generateAccessToken(userId:string, role: Role):string {
     });
 }
 
-export function generateRefreshToken(userId:string, role: Role, jti:string):string {
+export function generateRefreshToken(userId:string, jti:string):string {
     const payload:TokenPayload = {
         sub: userId,
-        role,
         type: "refresh",
         jti,
     };
@@ -55,14 +51,18 @@ export function verifyAccessToken(token:string):JwtPayload {
 }
 
 export function verifyRefreshToken(token:string):JwtPayload {
-    const payload = jwt.verify(
-        token,
-        env.JWT_REFRESH_SECRET
-    ) as TokenPayload;
+    try {
+        const payload = jwt.verify(
+            token,
+            env.JWT_REFRESH_SECRET
+        ) as TokenPayload;
 
-    if (payload.type !== "refresh") {
-        throw new AppError("Invalid token type!",401);
+        if (payload.type !== "refresh") {
+            throw new AppError("Invalid token type!",401);
+        }
+        return payload; 
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError("Invalid or expired refresh token!", 401);
     }
-    
-    return payload;
 }
