@@ -20,16 +20,18 @@ model User {
 }
 
 model Customer {
-  id          String    @id @default(cuid())
-  name        String
-  phone       String?
-  numInvoices Int       @default(0)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id                String    @id @default(cuid())
+  name              String
+  phone             String?
+  maxUnpaidInvoices Int       @default(2) @map("max_unpaid_invoices")
+  numInvoices       Int       @default(0) @map("num_invoices")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
 
   invoices Invoice[]
-
+  @@index([name])
   @@map("customers")
 }
 
@@ -43,28 +45,70 @@ model Invoice {
   dueDate     DateTime? @map("due_date")
   notes       String?
   invoiceDate DateTime  @default(now()) @map("invoice_date")
+  cancelReason String?   @map("cancel_reason")
 
   status   InvoiceStatus @default(UNPAID)
   items    InvoiceItem[]
   payments Payment[]
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  cancelledAt DateTime? @map("cancelled_at")
 
   @@index([customerId])
   @@index([status])
   @@map("invoices")
 }
 
+model Product {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String  @unique
+  baseUnit    String 
+  basePrice   Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  units        ProductUnit[]
+  invoiceItems InvoiceItem[]
+
+  @@index([code])
+  @@index([name])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model ProductUnit {
+  id          String    @id @default(cuid())
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String    @map("product_id")
+  unitName    String
+  conversionQty Int
+  price       Int
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@map("product_units")
+}
+
 model InvoiceItem {
   id        String  @id @default(cuid())
   invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   invoiceId String  @map("invoice_id")
-  name      String
-  quantity  Int
-  unitPrice Int     @map("unit_price")
-  subTotal  Int     @map("sub_total")
+  
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId String?
+  
+  name        String
+  unitName    String
+  quantity    Int
+  conversionQty Int
+  baseQty     Int
+  unitPrice   Int     @map("unit_price")
+  subTotal    Int     @map("sub_total")
 
   @@map("invoice_items")
 }

@@ -33,6 +33,7 @@ export class CustomerService {
             name:trimmedName,
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
+            maxUnpaidInvoices: data.maxUnpaidInvoices || 2
         });
     }
 
@@ -41,6 +42,10 @@ export class CustomerService {
 
         if(!customer) {
             throw new AppError("Customer tidak ditemukan", 404);
+        }
+
+        if(data.maxUnpaidInvoices !== undefined && data.maxUnpaidInvoices! < 0) {
+            throw new AppError("Batas Invoice Maksimal Tidak Boleh Negatif",400);
         }
 
         if (data.name) {
@@ -55,13 +60,14 @@ export class CustomerService {
                 if(exist) {
                     throw new AppError("Customer dengan nama ini sudah ada", 400);
                 }
-            }
+            }``
         }
 
         return customerRepository.update(id,{
             name: data.name?.trim(),
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
+            maxUnpaidInvoices: data.maxUnpaidInvoices || 2
         });
     }
 
