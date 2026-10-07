@@ -1,15 +1,16 @@
-import { InvoiceStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
-import { CreateInvoiceDTO, UpdateInvoiceDTO } from "../types/invoice.type";
+import { CreateOrderDTO, UpdateOrderDTO } from "../types/order.type";
 
-export class InvoiceRepository {
+
+export class OrderRepository {
 
     async findMany(filters?: {
         customerId?: string;
-        status?: InvoiceStatus;
+        status?: OrderStatus;
         search?: string;
     }) {
-        const where: Prisma.InvoiceWhereInput = {};
+        const where: Prisma.OrderWhereInput = {};
 
         if(filters?.customerId) {
             where.customerId = filters.customerId;
@@ -20,7 +21,7 @@ export class InvoiceRepository {
         if(filters?.search) {
             where.OR = [
                 {
-                    invoiceNo: {
+                    orderNo: {
                         contains: filters.search,
                         mode:"insensitive"
                     }
@@ -36,7 +37,7 @@ export class InvoiceRepository {
             ];
         }
 
-        return prisma.invoice.findMany({
+        return prisma.order.findMany({
             where,
             include: {
                 customer: {
@@ -55,7 +56,7 @@ export class InvoiceRepository {
         });
     }
     async findById(id:string) {
-        return prisma.invoice.findUnique({
+        return prisma.order.findUnique({
             where:{id},
             include: {
                 customer: true,
@@ -67,25 +68,29 @@ export class InvoiceRepository {
         });
     }
 
-    async findByInvoiceNo(invoiceNo:string) {
-        return prisma.invoice.findUnique({
-            where : { invoiceNo }
+    async findByOrderNo(orderNo:string) {
+        return prisma.order.findUnique({
+            where : { orderNo }
         });
     }
 
-    async create (data: CreateInvoiceDTO) {
-        return prisma.invoice.create ({
+    async create (data: CreateOrderDTO) {
+        return prisma.order.create ({
             data: {
                 customerId: data.customerId,
-                invoiceNo: data.invoiceNo,
+                orderNo: data.orderNo,
                 totalAmount: data.totalAmount,
                 paidAmount: data.paidAmount,
-                status: data.status || InvoiceStatus.UNPAID,
+                status: data.status || OrderStatus.UNPAID,
                 dueDate: data.dueDate,
                 notes: data.notes,
                 items: {
                     create: data.items.map((item) => ({
+                        productId: item.productId,
                         name: item.name,
+                        unitName: item.unitName,
+                        conversionQty: item.conversionQty,
+                        baseQty: item.baseQty,
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
                         subTotal: item.subTotal,
@@ -99,8 +104,8 @@ export class InvoiceRepository {
         });
     }
 
-    async update(id:string, data: UpdateInvoiceDTO) {
-        return prisma.invoice.update({
+    async update(id:string, data: UpdateOrderDTO) {
+        return prisma.order.update({
             where: {id},
             data,
             include: {
@@ -112,11 +117,11 @@ export class InvoiceRepository {
     }
 
     async cancel(id: string, reason?:string) {
-        return prisma.invoice.update({
+        return prisma.order.update({
             where: {id},
             data: {
-                status: InvoiceStatus.CANCELLED,
-                cancelReason: reason || "Invoice was cancelled",
+                status: OrderStatus.CANCELLED,
+                cancelReason: reason,
                 cancelledAt: new Date()
             },
             include:{
@@ -130,4 +135,4 @@ export class InvoiceRepository {
 
 }
 
-export const invoiceRepository = new InvoiceRepository();
+export const orderRepository = new OrderRepository();

@@ -1,3 +1,4 @@
+import { OrderStatus, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { CreateCustomerDTO, UpdateCustomerDTO } from "../types/customer.type";
 
@@ -18,17 +19,17 @@ export class CustomerRepository {
         return prisma.customer.findUnique({
             where: { id },
             include: {
-                invoices:{
+                orders:{
                     select: {
                         id: true,
-                        invoiceNo: true,
+                        orderNo: true,
                         totalAmount:true,
                         paidAmount:true,
                         status: true,
                         dueDate: true,
                         createdAt: true
                     },
-                    orderBy: {invoiceDate: "desc"}
+                    orderBy: {orderDate: "desc"}
                 },
             },
         });
@@ -53,6 +54,24 @@ export class CustomerRepository {
         });
     }
 
+    async calculateNumOrders(customerId:string, tx?: Prisma.TransactionClient):Promise<number> {
+        const client = tx || prisma;
+        const activeOrderCount = await client.order.count({
+            where : {
+                customerId,
+                status: {
+                    in: [OrderStatus.UNPAID, OrderStatus.PARTIALLY_PAID]
+                },
+            },
+        });
+
+        await client.customer.update({
+            where: { id : customerId },
+            data: { numOrders: activeOrderCount}
+        })
+        return activeOrderCount;
+    }
+    
     async delete(id:string) {
         return prisma.customer.update({
             where: {id},

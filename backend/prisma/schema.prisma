@@ -23,32 +23,33 @@ model Customer {
   id                String    @id @default(cuid())
   name              String
   phone             String?
-  maxUnpaidInvoices Int       @default(2) @map("max_unpaid_invoices")
-  numInvoices       Int       @default(0) @map("num_invoices")
+  maxUnpaidOrders   Int       @default(2) @map("max_unpaid_orders")
+  numOrders         Int       @default(0) @map("num_orders")
   notes             String?
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   deletedAt         DateTime? @map("deleted_at")
 
-  invoices Invoice[]
+  orders Order[]
+
   @@index([name])
   @@map("customers")
 }
 
-model Invoice {
-  id          String    @id @default(cuid())
-  customer    Customer  @relation(fields: [customerId], references: [id])
-  customerId  String    @map("customer_id")
-  invoiceNo   String    @unique @map("invoice_no")
-  totalAmount Int       @map("total_amount")
-  paidAmount  Int       @default(0) @map("paid_amount")
-  dueDate     DateTime? @map("due_date")
-  notes       String?
-  invoiceDate DateTime  @default(now()) @map("invoice_date")
+model Order {
+  id            String    @id @default(cuid())
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  customerId    String    @map("customer_id")
+  orderNo       String    @unique @map("order_no")
+  totalAmount   Int       @map("total_amount")
+  paidAmount    Int       @default(0) @map("paid_amount")
+  dueDate       DateTime? @map("due_date")
+  notes         String?
+  orderDate     DateTime  @default(now()) @map("order_date")
   cancelReason String?   @map("cancel_reason")
 
-  status   InvoiceStatus @default(UNPAID)
-  items    InvoiceItem[]
+  status   OrderStatus @default(UNPAID)
+  items    OrderItem[]
   payments Payment[]
 
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -57,7 +58,8 @@ model Invoice {
 
   @@index([customerId])
   @@index([status])
-  @@map("invoices")
+  @@index([orderNo])
+  @@map("orders")
 }
 
 model Product {
@@ -70,8 +72,8 @@ model Product {
   updatedAt   DateTime @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  units        ProductUnit[]
-  invoiceItems InvoiceItem[]
+  units         ProductUnit[]
+  orderItems    OrderItem[]
 
   @@index([code])
   @@index([name])
@@ -94,10 +96,10 @@ model ProductUnit {
   @@map("product_units")
 }
 
-model InvoiceItem {
+model OrderItem {
   id        String  @id @default(cuid())
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  invoiceId String  @map("invoice_id")
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String  @map("order_id")
   
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   productId String?
@@ -110,22 +112,24 @@ model InvoiceItem {
   unitPrice   Int     @map("unit_price")
   subTotal    Int     @map("sub_total")
 
-  @@map("invoice_items")
+  @@map("order_items")
 }
 
 model Payment {
   id            String   @id @default(cuid())
-  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
-  invoiceId     String   @map("invoice_id")
+  order         Order    @relation(fields: [orderId], references: [id])
+  orderId       String   @map("order_id")
   receiptNo     String?  @unique @map("receipt_no")
   amount        Int
-  paymentMethod String   @map("payment_method")
+  paymentMethod PaymentMethod   @map("payment_method")
   paymentDate   DateTime @default(now()) @map("paid_at")
   createdAt     DateTime @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
   notes         String?
 
-  @@index([invoiceId])
+  @@index([orderId])
   @@index([paymentDate])
+  @@index([deletedAt])
   @@map("payments")
 }
 
@@ -142,7 +146,7 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-enum InvoiceStatus {
+enum OrderStatus {
   PAID
   PARTIALLY_PAID
   UNPAID

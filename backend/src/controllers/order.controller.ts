@@ -1,43 +1,43 @@
-import { InvoiceStatus } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 import { Request, Response } from "express";
-import { invoiceService } from "../services/invoice.service";
+import { orderService } from "../services/order.service";
 import { success } from "../utils/response";
 
-export class InvoiceController {
+export class OrderController {
     async getAll(req:Request, res:Response) {
         const { customerId, status, search } = req.query;
 
-        const invoices = await invoiceService.getAllInvoices({
+        const orders = await orderService.getAllOrders({
             customerId: customerId as string | undefined,
-            status: status as InvoiceStatus | undefined,
+            status: status as OrderStatus | undefined,
             search: search as string | undefined,
         });
 
         return success (
             res,
             200,
-            "Berhasil mengambil data invoice",
-            invoices
+            "Berhasil mengambil data order",
+            orders
         );
     }
 
     async getById(req:Request, res:Response) {
         const { id } = req.params;
-        const invoice = await invoiceService.getInvoiceById(id.toString());
+        const order = await orderService.getOrderById(id.toString());
         return success (
             res,
             200,
-            "Berhasil mengambil data invoice",
-            invoice
+            "Berhasil mengambil data order",
+            order
         );
     }
 
     async create(req: Request, res: Response) {
-        const {customerId, invoiceNo, dueDate, notes, items } = req.body;
+        const {customerId, orderNo, dueDate, notes, items } = req.body;
 
-        const newInvoice = await invoiceService.createInvoice({
+        const newOrder = await orderService.createOrder({
             customerId,
-            invoiceNo,
+            orderNo,
             dueDate,
             notes,
             items,
@@ -46,8 +46,8 @@ export class InvoiceController {
         return success(
             res,
             201, 
-            "Invoice berhasil dibuat",
-            newInvoice
+            "Order berhasil dibuat",
+            newOrder
         );
     }
 
@@ -55,7 +55,7 @@ export class InvoiceController {
         const { id } = req.params;
         const { dueDate, notes, status } = req.body;
 
-        const updatedInvoice = await invoiceService.updateInvoice(id.toString(), {
+        const updatedOrder = await orderService.updateOrder(id.toString(), {
             dueDate,
             notes,
             status,
@@ -64,8 +64,8 @@ export class InvoiceController {
         return success (
             res,
             200,
-            "Invoice berhasil diperbarui",
-            updatedInvoice
+            "Order berhasil diperbarui",
+            updatedOrder
         );
     }
 
@@ -73,14 +73,14 @@ export class InvoiceController {
         const { id } = req.params;
         const { reason } = req.body;
 
-        const cancelledInvoice = await invoiceService.cancelInvoice(id.toString(),reason);
+        const cancelledOrder = await orderService.cancelOrder(id.toString(),reason);
         return success (
             res,
             200,
-            "Invoice berhasil dibatalkan", 
-            cancelledInvoice
+            "Order berhasil dibatalkan", 
+            cancelledOrder
         );
     }
 }
 
-export const invoiceController = new InvoiceController();
+export const orderController = new OrderController();

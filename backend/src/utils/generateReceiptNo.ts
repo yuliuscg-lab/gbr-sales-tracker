@@ -1,35 +1,37 @@
 import { prisma } from "../config/prisma";
 
-export async function generateInvoiceNo(date: Date = new Date()): Promise<string> {
+export async function generateReceiptNo(date: Date = new Date()):Promise<string> {
     const currentYear = date.getFullYear();
+
     const yy = String(currentYear).slice(-2);
-    const mm = String(date.getMonth()+1).padStart(2, "0");
+    const mm = String(date.getMonth()+ 1).padStart(2,"0");
+    const prefix = `PAY-${yy}${mm}`;
 
     const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0, 0);
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
 
-    const lastInvoiceOfYear = await prisma.invoice.findFirst({
+    const lastPayment = await prisma.payment.findFirst({
         where: {
             createdAt: {
                 gte: startOfYear,
                 lte: endOfYear,
             },
-            invoiceNo: {
-                startsWith: `INV-${yy}`,
+            receiptNo: {
+                startsWith: `PAY-${yy}`
             },
         },
         orderBy: {
-            createdAt: "desc",
+            createdAt: "desc"
         },
-        select:{
-            invoiceNo:true,
+        select: {
+            receiptNo: true,
         },
     });
 
     let nextSequence = 1;
 
-    if (lastInvoiceOfYear?.invoiceNo) {
-        const parts = lastInvoiceOfYear.invoiceNo.split("-");
+    if(lastPayment?.receiptNo) {
+        const parts = lastPayment.receiptNo.split("-");
         const lastSeqString = parts[parts.length-1];
         const lastSeq = parseInt(lastSeqString,10);
         
@@ -39,6 +41,5 @@ export async function generateInvoiceNo(date: Date = new Date()): Promise<string
     }
 
     const sequencePadded = String(nextSequence).padStart(4,"0");
-
-    return `INV-${yy}${mm}-${sequencePadded}`;
+    return `${prefix}-${sequencePadded}`;
 }

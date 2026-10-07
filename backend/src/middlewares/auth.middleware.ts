@@ -19,7 +19,7 @@ export function authenticate (req:Request, res:Response, next:NextFunction) {
         throw new AppError ("Access Denied, Token Not Found!", 401);
     }
 
-    const token = authHeader.split(" "[1]);
+    const token = authHeader.split(" ")[1];
 
     try {
         const payload = verifyAccessToken(token.toString());

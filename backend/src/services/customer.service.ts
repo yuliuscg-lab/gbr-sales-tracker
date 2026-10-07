@@ -1,5 +1,6 @@
 import { AppError } from "../errors/AppError";
 import { customerRepository } from "../repositories/customer.repository";
+import { orderRepository } from "../repositories/order.repository";
 import { CreateCustomerDTO, UpdateCustomerDTO } from "../types/customer.type";
 
 export class CustomerService {
@@ -33,7 +34,7 @@ export class CustomerService {
             name:trimmedName,
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
-            maxUnpaidInvoices: data.maxUnpaidInvoices || 2
+            maxUnpaidOrders: data.maxUnpaidOrders || 2
         });
     }
 
@@ -44,8 +45,8 @@ export class CustomerService {
             throw new AppError("Customer tidak ditemukan", 404);
         }
 
-        if(data.maxUnpaidInvoices !== undefined && data.maxUnpaidInvoices! < 0) {
-            throw new AppError("Batas Invoice Maksimal Tidak Boleh Negatif",400);
+        if(data.maxUnpaidOrders !== undefined && data.maxUnpaidOrders! < 0) {
+            throw new AppError("Batas Order Maksimal Tidak Boleh Negatif",400);
         }
 
         if (data.name) {
@@ -67,7 +68,7 @@ export class CustomerService {
             name: data.name?.trim(),
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
-            maxUnpaidInvoices: data.maxUnpaidInvoices || 2
+            maxUnpaidOrders: data.maxUnpaidOrders || 2
         });
     }
 
@@ -78,8 +79,8 @@ export class CustomerService {
             throw new AppError("Customer tidak ditemukan", 404);
         }
 
-        if(customer.numInvoices > 0) {
-            throw new AppError("Customer tidak bisa dihapus karena ada invoice yang belum dibayar!",400);
+        if(customer.numOrders > 0) {
+            throw new AppError("Customer tidak bisa dihapus karena ada order yang belum dibayar!",400);
         }
 
         return customerRepository.delete(id);
