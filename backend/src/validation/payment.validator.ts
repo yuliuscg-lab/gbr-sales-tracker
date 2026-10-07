@@ -1,10 +1,11 @@
+import { PaymentMethod } from "@prisma/client";
 import { z } from "zod";
 
-export const uploadPaymentProofSchema = z.object({
-    paymentId: z.string().cuid(),
-    paymentProof: z.string().url(),
+export const createPaymentSchema = z.object({
+    orderId: z.string().cuid(),
+    amount: z.number().positive(),
+    paymentDate: z.string().datetime(),
+    paymentMethod: z.nativeEnum(PaymentMethod),
+    notes: z.string().optional(),
 });
 
-export const rejectPaymentSchema = z.object({
-    reason: z.string().min(3).max(255).optional(),
-});

@@ -1,195 +1,118 @@
-import { PaymentStatus, SalesOrderStatus } from "@prisma/client";
-import { prisma } from "../config/prisma";
+import { OrderStatus, PaymentMethod } from "@prisma/client";
 import { AppError } from "../errors/AppError";
 import { paymentRepository } from "../repositories/payment.repository";
-import { UploadPaymentProof } from "../types/payment.types";
-import { salesOrderRepository } from "../repositories/sales-order.repository";
-import { couponService } from "./coupon.service";
-import { pointService } from "./point.service";
-import { pointsBucketRepository } from "../repositories/points-bucket.repository";
-import { salesOrderService, SalesOrderService } from "./sales-order.service";
-import { issuedTicketService } from "./issued-ticket.service";
+import { CreatePaymentDTO, PaymentFilterDTO } from "../types/payment.type";
+import { orderRepository } from "../repositories/order.repository";
+import { customerService } from "./customer.service";
+import { prisma } from "../config/prisma";
+import { customerRepository } from "../repositories/customer.repository";
+import { generateReceiptNo } from "../utils/generateReceiptNo";
 
-interface CancelResult {
-    salesOrderId: string;
-    ok: boolean;
-    error?: string;
-}
+export class PaymentService {
+    async getAllPayments (filters?: PaymentFilterDTO) {
+        return paymentRepository.findMany(filters);
+    }
 
-class PaymentService {
-    async uploadProof(customerId:string, payload:UploadPaymentProof){
+    async getPaymentById (id: string) {
+        const payment = await paymentRepository.findById(id);
+        if (!payment) throw new AppError("Pembayaran tidak ditemukan",404);
+        return payment;
+    }
+
+    async createPayment(data: CreatePaymentDTO) {
+        const amount = Number(data.amount);
+        if(isNaN(amount) || amount <= 0) {
+            throw new AppError("Nominal pembayaran harus berupa angka lebih dari 0!", 400);
+        }
+
+        const method = data.paymentMethod?.toUpperCase() as PaymentMethod;
+        if(!Object.values(PaymentMethod).includes(method)) {
+            throw new AppError("Metode pembayaran tidak valid!",400);
+        }
         
-        const payment = await paymentRepository.findById(
-            prisma,
-            payload.paymentId,
-        );
+        if (!data.paymentDate) {
+            throw new AppError("Tanggal pembayaran wajib diisi!", 400);
+        }
 
+        const order = await orderRepository.findById(data.orderId);
+
+        if(!order) {
+            throw new AppError("Order tidak ditemukan",404);
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new AppError("Tidak dapat mencatat pembayaran pada order yang telah dibatalkan", 400);
+        }
+
+        if (order.status === OrderStatus.PAID) {
+            throw new AppError("Order ini sudah lunas", 400);
+        }
+
+        const currentTotal = Number(order.totalAmount);
+        const currentPaid = Number(order.paidAmount);
+        const remaining = currentTotal - currentPaid;
+
+        if (amount > remaining) {
+            throw new AppError(`Pembayaran melebihi sisa tagihan. Sisa tagihan adalah Rp ${remaining.toLocaleString('id-ID')}`, 400);
+        }
+
+        const newPaidAmount = currentPaid + amount;
+        const newStatus = newPaidAmount >= currentTotal ? OrderStatus.PAID : OrderStatus.PARTIALLY_PAID;
+        const receiptNo = await generateReceiptNo();
+
+        return prisma.$transaction(async (tx)=> {
+            const payment = await paymentRepository.create({...data, paymentMethod: method, receiptNo }, tx);
+
+            await tx.order.update({
+                where: {
+                    id: order.id
+                },
+                data: {
+                    paidAmount: newPaidAmount,
+                    status: newStatus
+                }
+            });
+
+            await customerRepository.calculateNumOrders(order.customerId, tx);
+
+            return payment;
+        });
+    }
+
+    async deletePayment(id:string) {
+        const payment = await paymentRepository.findById(id.toString());
         if(!payment) {
-            throw new AppError(
-                "Payment tidak ditemukan!",
-                404
-            );
+            throw new AppError("Data pembayaran tidak ditemukan!",404);
         }
 
-        if (
-            payment.salesOrder.customerId !== customerId
-        ) {
-            throw new AppError("Pembayaran tidak ditemukan!", 404);
+        const order = payment.order;
+        if(!order) {
+            throw new AppError("Order tidak ditemukan",404);
         }
 
-        if (payment.status !== PaymentStatus.WAITING_UPLOAD) {
-            throw new AppError("Bukti pembayaran sudah pernah diupload", 400);
+        const paymentAmount = Number(payment.amount);
+        const currentPaid = Number(order.paidAmount);
+        const updatedPaid = Math.max(0, currentPaid - paymentAmount);
+
+        let updatedStatus:OrderStatus = OrderStatus.PARTIALLY_PAID;
+        if(updatedPaid === 0) {
+            updatedStatus = OrderStatus.UNPAID;
         }
 
-        if (payment.expiredAt < new Date() && payment.status === PaymentStatus.WAITING_UPLOAD) {
-            await this.expireOrder(payment.id);
-            throw new AppError("Pembayaran telah kadaluwarsa!", 400);
-        }
+        return prisma.$transaction(async (tx) => {
 
-        return paymentRepository.update(prisma, payment.id, {
-            paymentProof: payload.paymentProof,
-            paidAt: new Date(),
-            status: PaymentStatus.WAITING_VERIFICATION
-        });
-    }
-
-    async verifyPayment(adminId:string, paymentId:string) {
-        const payment = await paymentRepository.findById(
-            prisma,
-            paymentId,
-        );
-
-        if (!payment) {
-            throw new AppError("Pembayaran tidak ditemukan!", 404);
-        }
-
-        if (payment.status !== PaymentStatus.WAITING_VERIFICATION) {
-            throw new AppError("Pembayaran sudah diverifikasi", 400);
-        }
-
-        return prisma.$transaction(async(tx) => {
-            const verifiedPayment = await paymentRepository.update(
-                tx, payment.id,
-                {
-                    status: PaymentStatus.VERIFIED,
-                    verifiedBy: {
-                        connect: {
-                            id: adminId,
-                        },
-                    },
-                    verifiedAt: new Date(),
-                },
-            );
-
-            const salesOrder = await salesOrderRepository.update(tx, payment.salesOrder.id, {
-                status: SalesOrderStatus.PAID
-            });
-
-            if (salesOrder.couponId) {
-                await couponService.confirmCoupon(tx, salesOrder.couponId, salesOrder.id);
-            }
-
-            if (salesOrder.pointsUsed > 0) {
-                await pointService.consumePoint(
-                    tx,
-                    salesOrder.customerId,
-                    salesOrder.id,
-                );
-            }
-
-            await issuedTicketService.issueTickets(tx, {
-                id:salesOrder.id,
-                ticketTypeId:salesOrder.ticketTypeId,
-                ticketName: salesOrder.ticketName,
-                ticketPrice: salesOrder.ticketPrice,
-                qtyTickets:salesOrder.qtyTickets
-            });
-
-            return salesOrder;
-        });
-    }
-
-    async rejectPayment(adminId:string, paymentId:string, reason?:string) {
-        const payment = await paymentRepository.findById(prisma, paymentId);
-
-        if (!payment) {
-            throw new AppError("Pembayaran tidak ditemukan!", 404);
-        }
-
-        if (payment.status !== PaymentStatus.WAITING_VERIFICATION) {
-            throw new AppError("Pembayaran tidak dapat ditolak!", 400);
-        }
-
-        return prisma.$transaction(async(tx) => {
-            await paymentRepository.update(tx, payment.id, {
-                status: PaymentStatus.REJECTED,
-                verifiedBy: {
-                    connect: {
-                        id: adminId,
-                    },
-                },
-                verifiedAt: new Date(),
-                rejectReason: reason,
-            });
-
-            const salesOrder = await salesOrderRepository.findById(tx, payment.salesOrder.id);
+            await paymentRepository.delete(id, tx);
             
-            if(!salesOrder) {
-                throw new AppError("Sales Order tidak ditemukan",404);
-            }
-
-            const updatedSalesOrder = await salesOrderService.releaseOrder(tx, salesOrder);
-
-            return updatedSalesOrder;
-        });
-    }
-
-    private async expireOrder(paymentId: string) {
-        return prisma.$transaction(async(tx) => {
-            const payment = await paymentRepository.update(tx, paymentId, {
-                status: PaymentStatus.EXPIRED,
+            await tx.order.update({
+                where: { id: order.id },
+                data: {
+                    paidAmount: updatedPaid,
+                    status: updatedStatus
+                }
             });
 
-            const salesOrder = await salesOrderRepository.findById(tx, payment.salesOrderId);
-
-            if(!salesOrder || salesOrder.status !== SalesOrderStatus.WAITING_PAYMENT) {
-                return;
-            }
-
-            await salesOrderService.releaseOrder(tx, salesOrder);
+            await customerRepository.calculateNumOrders(order.customerId, tx);
         })
-    }
-    async cancelExpiredOrders() {
-        const expiredPayments = await paymentRepository.findExpiredWaitingUpload(prisma);
-
-        const results : CancelResult[] = [];
-
-        for (const payment of expiredPayments) {
-            try {
-                await prisma.$transaction(async(tx)=> {
-                    await paymentRepository.update(tx, payment.id, {
-                        status: PaymentStatus.EXPIRED,
-                    });
-
-                    const salesOrder = await salesOrderRepository.findById(tx, payment.salesOrderId);
-
-                    if(!salesOrder) {
-                        throw new AppError("Sales Order tidak ditemukan!", 404);
-                    }
-
-                    await salesOrderService.releaseOrder(tx, salesOrder);
-                });
-
-                results.push({ salesOrderId: payment.salesOrder.id, ok: true});
-            } catch (err) {
-                results.push({
-                    salesOrderId: payment.salesOrder.id,
-                    ok: false,
-                    error: err instanceof Error ? err.message:"Unknown error"
-                });
-            }
-        }
-        return results;
     }
 }
 
