@@ -1,20 +1,15 @@
 import { OrderStatus } from "@prisma/client"
 import { orderRepository } from "../repositories/order.repository";
-import { CreateOrderDTO, CreateOrderInput, CreateOrderItemDTO } from "../types/order.type";
+import { CreateOrderDTO, CreateOrderInput, CreateOrderItemDTO, UpdateOrderDTO } from "../types/order.type";
 import { customerRepository } from "../repositories/customer.repository";
 import { AppError } from "../errors/AppError";
 import { generateOrderNo } from "../utils/generateOrderNo";
-import { customerService } from "./customer.service";
 import { prisma } from "../config/prisma";
 import { paymentRepository } from "../repositories/payment.repository";
-
+import { OrderFilterParams } from "../types/order.type";
 
 export class OrderService {
-    async getAllOrders(filters?: { 
-        customerId?: string;
-        status?: OrderStatus;
-        search?: string;
-    }) {
+    async getAllOrders(filters?: OrderFilterParams) {
         return orderRepository.findMany(filters);
     }
 
@@ -40,16 +35,6 @@ export class OrderService {
             throw new AppError("Customer tidak ditemukan",404);
         }
 
-        const activeUnpaidCount = customer.numOrders;
-        const maxLimit = customer.maxUnpaidOrders;
-
-        if (activeUnpaidCount >= maxLimit) {
-            throw new AppError(
-                `Pelanggan telah mencapai batas maksimal order belum lunas (${maxLimit})`,
-                400 
-            );
-        }
-
         if (!input.items || input.items.length === 0) {
             throw new AppError("Order harus memiliki minimal 1 (satu) item",400);
         }
@@ -68,6 +53,7 @@ export class OrderService {
             const baseQty = item.quantity * conversionQty;
             const subTotal = item.quantity * item.unitPrice;
             totalAmount += subTotal;
+            totalAmount += input.deliveryFee ?? 0;
             return {
                 productId: item.productId,
                 name: item.name.trim(),
@@ -82,28 +68,61 @@ export class OrderService {
 
         const orderNo = await generateOrderNo();
         const dueDate = input.dueDate ? new Date(input.dueDate) : null;
+        const deliveryDate = new Date(input.deliveryDate);
 
         return prisma.$transaction(async (tx) => {
             
             const order = await tx.order.create({
                 data: {
-                customerId: input.customerId,
-                orderNo,
-                totalAmount,
-                paidAmount: 0,
-                status: OrderStatus.UNPAID,
-                dueDate,
-                notes: input.notes?.trim() || null,
-                items: {
-                    create: computedItems,
+                    customerId: input.customerId,
+                    orderNo,
+                    totalAmount,
+                    paidAmount: 0,
+                    status: OrderStatus.UNPAID,
+                    dueDate,
+                    notes: input.notes?.trim() || null,
+                    deliveryFee: input.deliveryFee ?? 0,
+                    deliveryDate,
+                    items: {
+                        create: computedItems.map((item)=> ({
+                            productId:item.productId,
+                            name: item.name,
+                            unitName: item.unitName,
+                            conversionQty: item.conversionQty,
+                            baseQty: item.baseQty,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            subTotal: item.subTotal,
+                        })),
+                    },
                 },
-            },
-                include: {
-                    customer: true,
-                    items: true,
-                },
-            });
-            await customerRepository.calculateNumOrders(input.customerId, tx);
+                    include: {
+                        customer: true,
+                        items: true,
+                    },
+                });
+
+            for(const item of input.items) {
+                if(item.productUnitId) {
+                    await tx.customerProductPrice.upsert({
+                        where: {
+                            customerId_productUnitId: {
+                                customerId: input.customerId,
+                                productUnitId: item.productUnitId,
+                            },
+                        },
+                        create: {
+                            customerId: input.customerId,
+                            productUnitId: item.productUnitId,
+                            price: item.unitPrice,
+                        },
+                        update: {
+                            price: item.unitPrice,
+                        },
+                    });
+                }
+            }
+            await customerRepository.syncOrderMetrics(input.customerId, tx);
             return order;
         });
     }
@@ -112,6 +131,7 @@ export class OrderService {
         dueDate?:string|null;
         notes?:string|null;
         status?:OrderStatus;
+        deliveryDate?:string;
     }) {
         const order = await orderRepository.findById(id);
         if (!order) {
@@ -129,7 +149,7 @@ export class OrderService {
         }
 
         //3. Hanya izinkan perubahan metadata non-nominal
-        const updatePayload: { dueDate?:Date|null, notes?: string|null} = {};
+        const updatePayload: UpdateOrderDTO = {};
 
         if (data.dueDate !== undefined) {
             updatePayload.dueDate = data.dueDate ? new Date(data.dueDate):null;
@@ -137,6 +157,10 @@ export class OrderService {
 
         if (data.notes !== undefined) {
             updatePayload.notes = data.notes?.trim() || null;
+        }
+
+        if (data.deliveryDate !== undefined) {
+            updatePayload.deliveryDate = new Date(data.deliveryDate);
         }
 
         return orderRepository.update(id, updatePayload);
@@ -171,7 +195,7 @@ export class OrderService {
                 },
             });
 
-            await customerRepository.calculateNumOrders(order.customerId, tx);
+            await customerRepository.syncOrderMetrics(order.customerId, tx);
 
             return cancelledOrder;
         });

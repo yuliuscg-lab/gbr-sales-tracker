@@ -18,20 +18,6 @@ export class CustomerRepository {
     async findById(id:string) {
         return prisma.customer.findUnique({
             where: { id },
-            include: {
-                orders:{
-                    select: {
-                        id: true,
-                        orderNo: true,
-                        totalAmount:true,
-                        paidAmount:true,
-                        status: true,
-                        dueDate: true,
-                        createdAt: true
-                    },
-                    orderBy: {orderDate: "desc"}
-                },
-            },
         });
     }
 
@@ -54,22 +40,36 @@ export class CustomerRepository {
         });
     }
 
-    async calculateNumOrders(customerId:string, tx?: Prisma.TransactionClient):Promise<number> {
+    async syncOrderMetrics(customerId:string, tx?: Prisma.TransactionClient):Promise<{totalOrders:number; unpaidOrdersCount:number}> {
         const client = tx || prisma;
-        const activeOrderCount = await client.order.count({
-            where : {
-                customerId,
-                status: {
-                    in: [OrderStatus.UNPAID, OrderStatus.PARTIALLY_PAID]
+
+        const [totalOrders, unpaidOrdersCount] = await Promise.all([
+            client.order.count({
+                where: {
+                    customerId,
+                    status: {
+                        not: OrderStatus.CANCELLED
+                    },
                 },
-            },
-        });
+            }),
+            client.order.count({
+                where: {
+                    customerId,
+                    status: {
+                        in: [OrderStatus.UNPAID, OrderStatus.PARTIALLY_PAID],
+                    },
+                },
+            }),
+        ]);
 
         await client.customer.update({
             where: { id : customerId },
-            data: { numOrders: activeOrderCount}
-        })
-        return activeOrderCount;
+            data: { 
+                totalOrders,
+                unpaidOrdersCount,
+            },
+        });
+        return {totalOrders, unpaidOrdersCount};
     }
     
     async delete(id:string) {

@@ -22,7 +22,7 @@ export class ProductRepository {
                     orderBy: { conversionQty: "asc" },
                 },
             },
-            orderBy: { name: "asc" },
+            orderBy: { code: "asc" },
         });
     }
 
@@ -56,7 +56,6 @@ export class ProductRepository {
             {
                 unitName: data.baseUnit,
                 conversionQty: 1,
-                price: data.basePrice,
             },
             ...(data.additionalUnits || []),
         ];
@@ -66,9 +65,11 @@ export class ProductRepository {
                 code: data.code,
                 name: data.name,
                 baseUnit: data.baseUnit,
-                basePrice: data.basePrice,
                 units: {
-                    create: unitsData,
+                    create: unitsData.map((u)=> ({
+                        unitName: u.unitName,
+                        conversionQty: u.conversionQty,
+                    })),
                 },
             },
             include: {
@@ -96,40 +97,54 @@ export class ProductRepository {
                 data : {
                     ...(data.name && { name: data.name}),
                     ...(data.baseUnit && { baseUnit: data.baseUnit}),
-                    ...(data.basePrice !== undefined && { basePrice: data.basePrice})
                 },
             });
 
-            if (data.basePrice !== undefined || data.baseUnit !== undefined) {
+            if (data.baseUnit && data.baseUnit !== current.baseUnit) {
                 const baseUnitRecord = current.units.find((u)=>u.conversionQty ===1);
                 if(baseUnitRecord) {
                     await tx.productUnit.update({
                         where: {id: baseUnitRecord.id},
-                        data: {
-                            ...(data.baseUnit && { unitName: data.baseUnit }),
-                            ...(data.basePrice !== undefined && {price:data.basePrice}),
-                        },
+                        data: { unitName:data.baseUnit },
                     });
                 }
             }
 
             if(data.additionalUnits ) {
-                await tx.productUnit.deleteMany({
-                    where : {
-                        productId: id,
-                        conversionQty: { gt: 1 },
-                    },
-                });
+                const incomingUnitNames = data.additionalUnits.map((u)=> u.unitName?.toLowerCase());
 
-                if (data.additionalUnits.length>0) {
-                    await tx.productUnit.createMany({
-                        data: data.additionalUnits.map((u)=> ({
-                            productId: id,
-                            unitName: u.unitName!,
-                            conversionQty: u.conversionQty!,
-                            price: u.price!, 
-                        })),
+                const unitsToDelete = current.units.filter(
+                    (u) => u.conversionQty > 1
+                );
+
+                if(unitsToDelete.length > 0) {
+                    await tx.productUnit.deleteMany({
+                        where: {
+                            id: { in: unitsToDelete.map((u) => u.id) },
+                        },
                     });
+                }
+                
+
+                for (const unit of data.additionalUnits) {
+                    const existingUnit = current.units.find(
+                        (u) => u.unitName.toLowerCase() === unit.unitName?.toLowerCase()
+                    );
+
+                    if(existingUnit) {
+                        await tx.productUnit.update({
+                            where: { id: existingUnit.id },
+                            data: { conversionQty: unit.conversionQty },
+                        });
+                    } else {
+                        await tx.productUnit.create({
+                            data: {
+                                productId: id,
+                                unitName: unit.unitName!,
+                                conversionQty: unit.conversionQty!,
+                            },
+                        });
+                    }
                 }
             }
 

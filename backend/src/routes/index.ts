@@ -6,6 +6,7 @@ import customerRouter from "./customer.route";
 import orderRouter from "./order.route";
 import productRouter from "./product.route";
 import paymentRouter from "./payment.route";
+import priceMatrixRouter from "./priceMatrix.route";
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use("/customers", customerRouter);
 router.use("/orders", orderRouter);
 router.use("/products", productRouter);
 router.use("/payments", paymentRouter);
+router.use("/price-matrix", priceMatrixRouter);
 
 export default router;

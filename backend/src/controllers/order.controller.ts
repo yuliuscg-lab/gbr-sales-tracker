@@ -5,12 +5,16 @@ import { success } from "../utils/response";
 
 export class OrderController {
     async getAll(req:Request, res:Response) {
-        const { customerId, status, search } = req.query;
+        const { customerId, status, search, startDate, endDate, dueStartDate, dueEndDate } = req.query;
 
         const orders = await orderService.getAllOrders({
             customerId: customerId as string | undefined,
             status: status as OrderStatus | undefined,
             search: search as string | undefined,
+            startDate: startDate as string | undefined,
+            endDate: endDate as string | undefined,
+            dueStartDate: dueStartDate as string | undefined,
+            dueEndDate: dueEndDate as string | undefined,
         });
 
         return success (
@@ -33,13 +37,15 @@ export class OrderController {
     }
 
     async create(req: Request, res: Response) {
-        const {customerId, orderNo, dueDate, notes, items } = req.body;
+        const {customerId, orderNo, dueDate, notes, deliveryFee, items, deliveryDate } = req.body;
 
         const newOrder = await orderService.createOrder({
             customerId,
             orderNo,
             dueDate,
             notes,
+            deliveryFee,
+            deliveryDate,
             items,
         });
 
@@ -53,12 +59,13 @@ export class OrderController {
 
     async update(req:Request, res:Response) {
         const { id } = req.params;
-        const { dueDate, notes, status } = req.body;
+        const { dueDate, notes, status, deliveryDate } = req.body;
 
         const updatedOrder = await orderService.updateOrder(id.toString(), {
             dueDate,
             notes,
             status,
+            deliveryDate
         });
 
         return success (

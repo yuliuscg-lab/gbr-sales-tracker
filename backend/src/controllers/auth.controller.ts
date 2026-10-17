@@ -6,7 +6,7 @@ import { failure, success } from "../utils/response";
 export class AuthController {
     async login (req: Request, res: Response) {
         const {username, password} = req.body;
-        const {accessToken, refreshToken} = await authService.login(username,password);
+        const {accessToken, refreshToken, user} = await authService.login(username,password);
 
         res.cookie(
             "refreshToken", 
@@ -18,12 +18,14 @@ export class AuthController {
             res,
             200,
             "Login successful!", 
-            {accessToken});
+            {accessToken, user}
+        );
     }
 
     async refresh (req: Request, res:Response) {
-        const refreshToken = req.cookies.refreshToken;
 
+        const refreshToken = req.cookies.refreshToken;
+                
         if(!refreshToken) {
             return failure(
                 res,
@@ -32,7 +34,7 @@ export class AuthController {
             )
         }
 
-        const { accessToken, refreshToken: newRefreshToken } = await authService.refresh(refreshToken);
+        const { accessToken, newRefreshToken, user } = await authService.refresh(refreshToken);
 
         res.cookie(
             "refreshToken", 
@@ -43,7 +45,7 @@ export class AuthController {
             res,
             200,
             "Token berhasil diperbarui", 
-            {accessToken});
+            {accessToken, user});
     }
 
     async logout(req: Request, res:Response) {

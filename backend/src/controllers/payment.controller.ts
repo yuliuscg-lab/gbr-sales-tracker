@@ -34,14 +34,13 @@ export class PaymentController {
     }
 
     async create(req: Request, res: Response) {
-        const { orderId, amount, paymentDate, paymentMethod, notes, receiptNo } = req.body;
+        const { orderId, amount, paymentDate, paymentMethod, notes } = req.body;
         const newPayment = await paymentService.createPayment({
             orderId,
             amount: Number(amount),
             paymentDate,
             paymentMethod,
-            notes,
-            receiptNo,
+            notes
         });
         return success(
             res,

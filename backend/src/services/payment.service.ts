@@ -73,7 +73,7 @@ export class PaymentService {
                 }
             });
 
-            await customerRepository.calculateNumOrders(order.customerId, tx);
+            await customerRepository.syncOrderMetrics(order.customerId, tx);
 
             return payment;
         });
@@ -111,7 +111,7 @@ export class PaymentService {
                 }
             });
 
-            await customerRepository.calculateNumOrders(order.customerId, tx);
+            await customerRepository.syncOrderMetrics(order.customerId, tx);
         })
     }
 }

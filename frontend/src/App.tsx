@@ -1,21 +1,33 @@
-import React from 'react';
-import { AppRoutes } from './routes/AppRoutes';
-import { useInitAuth } from './hooks/useInitAuth';
-import { Loader2 } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { AppRoutes } from './routes/index';
+import { useAuthStore } from './store/authStore';
+import { authApi } from './api/auth';
 
 export const App: React.FC = () => {
-  const { isLoading } = useInitAuth();
+  const { setAuth, setAccessToken, logout, setInitialized } = useAuthStore();
+  
+  useEffect(()=> {
+    const bootstrapSession = async() => {
+      try {
+        const res = await authApi.refresh();
+        if(res.data?.accessToken && res.data?.user) {
+          setAuth(res.data.accessToken, res.data.user)
+        } else if (res.data.accessToken) {
+          setAccessToken(res.data.accessToken);
+        } else {
+          logout();
+        }
+      } catch {
+        logout();
+      } finally {
+        setInitialized(true);
+      }
+    };
 
-  if (isLoading) {
-    return(
-      <div className="flex h-screen w-full items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-2 text-primary">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p className="text-sm font-medium text-neutral-500">Memuat sesi...</p>
-        </div>
-      </div>
-    )
-  }
+    bootstrapSession();
+  }, [setAuth, setAccessToken, logout, setInitialized]);
+
   return <AppRoutes />;
 };
+
 export default App;

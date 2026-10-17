@@ -6,7 +6,7 @@ export interface CreatePaymentDTO {
     paymentMethod: PaymentMethod;
     paymentDate: Date;
     notes?: string;
-    receiptNo: string;
+    receiptNo?: string;
 }
 
 export interface PaymentFilterDTO {

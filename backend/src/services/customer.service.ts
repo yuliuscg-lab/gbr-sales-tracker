@@ -34,7 +34,8 @@ export class CustomerService {
             name:trimmedName,
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
-            maxUnpaidOrders: data.maxUnpaidOrders || 2
+            totalOrders:0,
+            unpaidOrdersCount:0
         });
     }
 
@@ -43,10 +44,6 @@ export class CustomerService {
 
         if(!customer) {
             throw new AppError("Customer tidak ditemukan", 404);
-        }
-
-        if(data.maxUnpaidOrders !== undefined && data.maxUnpaidOrders! < 0) {
-            throw new AppError("Batas Order Maksimal Tidak Boleh Negatif",400);
         }
 
         if (data.name) {
@@ -68,7 +65,6 @@ export class CustomerService {
             name: data.name?.trim(),
             phone: data.phone?.trim() || null,
             notes: data.notes?.trim() || null,
-            maxUnpaidOrders: data.maxUnpaidOrders || 2
         });
     }
 
@@ -79,7 +75,7 @@ export class CustomerService {
             throw new AppError("Customer tidak ditemukan", 404);
         }
 
-        if(customer.numOrders > 0) {
+        if(customer.unpaidOrdersCount > 0) {
             throw new AppError("Customer tidak bisa dihapus karena ada order yang belum dibayar!",400);
         }
 

@@ -26,19 +26,21 @@ export class CustomerController {
     }
 
     async create(req: Request, res: Response) {
-        const { name, phone, notes, maxUnpaidInvoices } = req.body;
+        const { name, phone, notes, totalOrders, unpaidOrdersCount } = req.body;
         const newCustomer = await customerService.createCustomer({ 
             name, 
             phone, 
-            notes, 
-            maxUnpaidInvoices: maxUnpaidInvoices !== undefined?Number(maxUnpaidInvoices):undefined });
+            notes,
+            totalOrders,
+            unpaidOrdersCount,
+        });
         return success(res, 201, "Pelanggan berhasil ditambahkan", newCustomer);
     }
 
     async update(req: Request, res: Response) {
         const { id } = req.params;
-        const { name, phone, notes, maxUnpaidInvoices } = req.body;
-        const updatedCustomer = await customerService.updateCustomer(id.toString(), { name, phone, notes, maxUnpaidInvoices });
+        const { name, phone, notes } = req.body;
+        const updatedCustomer = await customerService.updateCustomer(id.toString(), { name, phone, notes });
         return success(res, 200, "Data pelanggan berhasil diperbarui", updatedCustomer);
     }
 
