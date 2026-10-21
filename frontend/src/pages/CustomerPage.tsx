@@ -3,11 +3,11 @@ import { AxiosError } from 'axios';
 import {
     Users,
     UserPlus,
-    Search,
     Phone,
     Edit2,
     Trash2,
     Loader2,
+    Plus,
 } from 'lucide-react';
 import { customerApi } from '../api/customer';
 import { CustomerFormData } from '../validation/customer.validation';
@@ -133,20 +133,20 @@ export const CustomersPage: React.FC = () => {
             {/* Header Bar */}
             <div className="flex flex-col md:flex-row gap-4 justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-800">
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-800">
                         Customer Master Data
                     </h1>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-xs sm:text-sm text-slate-500">
                         Manage customer master data and limit quota
                     </p>
                 </div>
                 <button
                     type="button"
                     onClick={handleOpenCreateModal}
-                    className="flex items-center justify-center gap-2 cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                    className="hidden md:flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
                 >
                     <UserPlus size={18} />
-                    <span>Add New Customer</span>
+                    <span>New Customer</span>
                 </button>
             </div>
 
@@ -335,6 +335,15 @@ export const CustomersPage: React.FC = () => {
                     </span>
                 }
             />
+            <button
+                            type="button"
+                            onClick={handleOpenCreateModal}
+                            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 sm:hidden cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-95 transition-all focus:outline-none"
+                            title="Add New Customer"
+                            aria-label="Add New Customer"
+                        >
+                            <Plus size={28} />
+                        </button>
         </div>
     );
 };

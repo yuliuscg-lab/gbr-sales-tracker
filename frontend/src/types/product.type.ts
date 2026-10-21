@@ -11,6 +11,7 @@ export interface Product {
     code: string;
     name: string;
     baseUnit: string;
+    costPrice?: number;
     units: ProductUnit[];
     createdAt: string;
     updatedAt: string;

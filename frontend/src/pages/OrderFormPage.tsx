@@ -35,6 +35,10 @@ import {
 } from '../validation/order.validation';
 import { Product } from '../types/product.type';
 import { Customer } from '@/types/customer.type';
+import { ProductModal } from '@/components/products/ProductModal';
+import { ProductFormData } from '@/validation/product.validation';
+import { CustomerFormData } from '@/validation/customer.validation';
+import { CustomerModal } from '@/components/customers/CustomerModal';
 
 export const OrderFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -65,6 +69,11 @@ export const OrderFormPage: React.FC = () => {
     const productDropdownRefs = useRef<{
         [key: number]: HTMLDivElement | null;
     }>({});
+
+    // Melacak baris item yang sedang aktif di field harga
+    const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(
+        null
+    );
 
     const formatDateForInput = (dateValue?: string | Date | null) => {
         if (!dateValue) return '';
@@ -121,6 +130,81 @@ export const OrderFormPage: React.FC = () => {
         control,
         name: 'items',
     });
+
+    // Modal register new product
+    const [isRegisterProductModalOpen, setIsRegisterProductModalOpen] =
+        useState(false);
+    const [registerProductError, setRegisterProductError] = useState<
+        string | null
+    >(null);
+
+    const handleOpenRegisterProductModal = () => {
+        setRegisterProductError(null);
+        setIsRegisterProductModalOpen(true);
+    };
+
+    const registerProductMutation = useMutation({
+        mutationFn: (data: ProductFormData) => productApi.create(data),
+        onSuccess: (newProduct) => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            setRegisterProductError(null);
+
+            setProductSearches((prev) => ({
+                ...prev,
+                [fields.length]: newProduct.name,
+            }));
+
+            setIsRegisterProductModalOpen(false);
+        },
+        onError: (error: unknown) => {
+            if (error instanceof AxiosError && error.response?.data?.message) {
+                setRegisterProductError(error.response?.data?.message);
+            } else {
+                setRegisterProductError('Register New Product Failed.');
+            }
+        },
+    });
+
+    const handleRegisterProductSubmit = async (data: ProductFormData) => {
+        setRegisterProductError(null);
+        await registerProductMutation.mutateAsync(data);
+    };
+
+    //Modal Register New Customer
+    const [isRegisterCustomerModalOpen, setIsRegisterCustomerModalOpen] =
+        useState(false);
+    const [registerCustomerError, setRegisterCustomerError] = useState<
+        string | null
+    >(null);
+
+    const handleOpenRegisterCustomerModal = () => {
+        setRegisterCustomerError(null);
+        setIsRegisterCustomerModalOpen(true);
+    };
+
+    const registerCustomerMutation = useMutation({
+        mutationFn: (data: CustomerFormData) => customerApi.create(data),
+        onSuccess: (newCustomer) => {
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            setRegisterCustomerError(null);
+
+            applySelectedCustomer(newCustomer);
+
+            setIsRegisterCustomerModalOpen(false);
+        },
+        onError: (error: unknown) => {
+            if (error instanceof AxiosError && error.response?.data?.message) {
+                setRegisterCustomerError(error.response?.data?.message);
+            } else {
+                setRegisterCustomerError('Register New Customer Failed.');
+            }
+        },
+    });
+
+    const handleRegisterCustomerSubmit = async (data: CustomerFormData) => {
+        setRegisterCustomerError(null);
+        await registerCustomerMutation.mutateAsync(data);
+    };
 
     const selectedCustomerId = watch('customerId');
     const watchedItems = watch('items');
@@ -316,7 +400,7 @@ export const OrderFormPage: React.FC = () => {
         setActiveProductDropdown(null);
     };
 
-    const handleClearSelectProduct = (index: number) =>{
+    const handleClearSelectProduct = (index: number) => {
         if (isEditMode) return;
         setValue(`items.${index}.productId`, '', { shouldValidate: true });
         setValue(`items.${index}.name`, '', { shouldValidate: true });
@@ -326,7 +410,7 @@ export const OrderFormPage: React.FC = () => {
         setValue(`items.${index}.conversionQty`, 1);
         setValue(`items.${index}.unitPrice`, 0, { shouldValidate: true });
         setActiveProductDropdown(null);
-    }
+    };
 
     const handleUnitChange = (index: number, productUnitId: string) => {
         if (isEditMode) return;
@@ -488,11 +572,19 @@ export const OrderFormPage: React.FC = () => {
                             <User size={16} className="text-blue-600" />
                             <span>Customer</span>
                         </h2>
-                        {isEditMode && (
+                        {isEditMode ? (
                             <span className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                                 <Lock size={12} />
-                                Locked
                             </span>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleOpenRegisterCustomerModal}
+                                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                                <Plus size={15} />
+                                New Customer
+                            </button>
                         )}
                     </div>
 
@@ -644,27 +736,36 @@ export const OrderFormPage: React.FC = () => {
                         {isEditMode ? (
                             <span className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                                 <Lock size={12} />
-                                Items locked in edit mode
                             </span>
                         ) : (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    append({
-                                        productId: '',
-                                        productUnitId: '',
-                                        name: '',
-                                        unitName: '',
-                                        conversionQty: 1,
-                                        quantity: 1,
-                                        unitPrice: 0,
-                                    });
-                                }}
-                                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-                            >
-                                <Plus size={15} />
-                                <span>Add Product</span>
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleOpenRegisterProductModal}
+                                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                                >
+                                    <Plus size={15} />
+                                    New Product
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        append({
+                                            productId: '',
+                                            productUnitId: '',
+                                            name: '',
+                                            unitName: '',
+                                            conversionQty: 1,
+                                            quantity: 1,
+                                            unitPrice: 0,
+                                        });
+                                    }}
+                                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                                >
+                                    <Plus size={15} />
+                                    <span>Add Product</span>
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -774,11 +875,16 @@ export const OrderFormPage: React.FC = () => {
                                                     }}
                                                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                                                 />
-                                                {watchedItems[index].productId &&
+                                                {watchedItems[index]
+                                                    .productId &&
                                                     !isEditMode && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleClearSelectProduct(index)}
+                                                            onClick={() =>
+                                                                handleClearSelectProduct(
+                                                                    index
+                                                                )
+                                                            }
                                                             className="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
                                                         >
                                                             <X size={16} />
@@ -992,6 +1098,17 @@ export const OrderFormPage: React.FC = () => {
                                                                   )
                                                                 : ''
                                                         }
+                                                        onFocus={() => {
+                                                            if (!isEditMode)
+                                                                setFocusedPriceIndex(
+                                                                    index
+                                                                );
+                                                        }}
+                                                        onBlur={() => {
+                                                            setFocusedPriceIndex(
+                                                                null
+                                                            );
+                                                        }}
                                                         onChange={(e) => {
                                                             const clean =
                                                                 e.target.value.replace(
@@ -1014,6 +1131,97 @@ export const OrderFormPage: React.FC = () => {
                                                         }}
                                                         className="w-full text-right rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-medium focus:border-blue-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                                                     />
+
+                                                    {/* Tooltip Informasi HPP saat Input Harga On Focus */}
+                                                    {focusedPriceIndex ===
+                                                        index &&
+                                                        currentProduct && (
+                                                            <div className="absolute left-0 top-full z-40 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl backdrop-blur-xs animate-in fade-in zoom-in-95 pointer-events-none">
+                                                                <div className="text-[10px] font-bold uppercase tracking-wider pb-1.5 mb-1.5 flex items-center justify-between">
+                                                                    <span>
+                                                                        Cost
+                                                                        Information
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="space-y-1.5 text-[11px]">
+                                                                    {/* 1. HPP per Base Unit */}
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span>
+                                                                            HPP
+                                                                            /{' '}
+                                                                            {
+                                                                                currentProduct.baseUnit
+                                                                            }
+                                                                            :
+                                                                        </span>
+                                                                        <span className="font-bold">
+                                                                            {formatIDR(
+                                                                                Number(
+                                                                                    currentProduct.costPrice ||
+                                                                                        0
+                                                                                )
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* 2. Total Modal Satuan Terpilih (Hanya muncul jika bukan baseUnit / conversionQty > 1) */}
+                                                                    {watch(
+                                                                        `items.${index}.unitName`
+                                                                    ) &&
+                                                                        watch(
+                                                                            `items.${index}.unitName`
+                                                                        )
+                                                                            ?.trim()
+                                                                            .toLowerCase() !==
+                                                                            currentProduct.baseUnit
+                                                                                ?.trim()
+                                                                                .toLowerCase() &&
+                                                                        Number(
+                                                                            watch(
+                                                                                `items.${index}.conversionQty`
+                                                                            )
+                                                                        ) >
+                                                                            1 && (
+                                                                            <div className="flex items-center justify-between pt-1">
+                                                                                <span>
+                                                                                    HPP
+                                                                                    /{' '}
+                                                                                    {watch(
+                                                                                        `items.${index}.unitName`
+                                                                                    )}{' '}
+                                                                                    <span className="text-[10px] ml-1">
+                                                                                        (
+                                                                                        {watch(
+                                                                                            `items.${index}.conversionQty`
+                                                                                        )}{' '}
+                                                                                        {
+                                                                                            currentProduct.baseUnit
+                                                                                        }
+                                                                                        )
+                                                                                    </span>
+
+                                                                                    :
+                                                                                </span>
+                                                                                <span className="font-bold">
+                                                                                    {formatIDR(
+                                                                                        Number(
+                                                                                            currentProduct.costPrice ||
+                                                                                                0
+                                                                                        ) *
+                                                                                            (Number(
+                                                                                                watch(
+                                                                                                    `items.${index}.conversionQty`
+                                                                                                )
+                                                                                            ) ||
+                                                                                                1)
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                 </div>
 
                                                 <div className="shrink-0 text-right text-[12px] font-bold text-slate-700 min-w-18.75">
@@ -1054,13 +1262,13 @@ export const OrderFormPage: React.FC = () => {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {/* 1. Delivery Fee (Terkunci saat Edit) */}
                         <div>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                                 <label className="block text-[12px] font-semibold tracking-wider text-slate-700">
                                     Delivery Fee (Rp)
                                 </label>
                                 {isEditMode && (
                                     <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                                        <Lock size={11} /> Locked
+                                        <Lock size={11} />
                                     </span>
                                 )}
                             </div>
@@ -1246,6 +1454,18 @@ export const OrderFormPage: React.FC = () => {
                     </div>
                 </div>
             )}
+            <ProductModal
+                isOpen={isRegisterProductModalOpen}
+                onClose={() => setIsRegisterProductModalOpen(false)}
+                onSubmit={handleRegisterProductSubmit}
+                serverError={registerProductError}
+            />
+            <CustomerModal
+                isOpen={isRegisterCustomerModalOpen}
+                onClose={() => setIsRegisterCustomerModalOpen(false)}
+                onSubmit={handleRegisterCustomerSubmit}
+                serverError={registerCustomerError}
+            />
         </div>
     );
 };

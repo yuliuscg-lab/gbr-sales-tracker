@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import {
     TableProperties,
-    Search,
     Save,
     RotateCcw,
     Loader2,
@@ -162,9 +161,9 @@ export const PriceMatrixPage: React.FC = () => {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold tracking-wide text-slate-800">Customer Prices Master Data</h1>
+                        <h1 className="text-xl md:text-2xl font-bold tracking-wide text-slate-800">Customer Prices Master Data</h1>
                     </div>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-xs md:text-sm text-slate-500">
                         Set product prices per unit for each customer
                     </p>
                 </div>
@@ -203,7 +202,7 @@ export const PriceMatrixPage: React.FC = () => {
             <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-xs text-blue-800 max-w-xl">
                 <div className="flex items-center gap-2">
                     <HelpCircle size={20} className="shrink-0 text-blue-600" />
-                    <span className="text-sm">
+                    <span className="text-xs md:text-sm">
                         Setting up specific prices for <strong>{selectedCustomerObj?.name || 'Customer'}</strong>.
                     </span>
                 </div>

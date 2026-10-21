@@ -8,6 +8,7 @@ export interface CreateOrderItemDTO {
     baseQty: number;
     quantity: number;
     unitPrice: number;
+    costPrice?: number;
     subTotal: number;
 }
 

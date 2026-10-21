@@ -124,10 +124,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             {/* Modal Card */}
             <div className="relative w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in-95">
                 {/* Header Modal */}
-                <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-2">
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-blue-600">
+                            <span className="font-mono text-sm md:text-md font-bold text-blue-600">
                                 {order.orderNo}
                             </span>
                             {renderStatusBadge(order.status)}
@@ -135,11 +135,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                         <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
                             <span className="flex items-center gap-1">
                                 <Calendar size={12} />
-                                Order Date : {formatDate(order.createdAt)}
+                                Order : {formatDate(order.createdAt)}
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1 text-slate-600 font-medium">
-                                Due Date : {formatDate(order.dueDate)}
+                                Due : {formatDate(order.dueDate)}
                             </span>
                         </div>
                     </div>

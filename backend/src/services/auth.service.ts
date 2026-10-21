@@ -20,7 +20,7 @@ export class AuthService {
         );
 
         if(!isMatch) {
-            throw new AppError("Email atau password salah!", 401);
+            throw new AppError("Username atau password salah!", 401);
         };
 
         const {accessToken, refreshToken } = await this.generateTokens(user.id);

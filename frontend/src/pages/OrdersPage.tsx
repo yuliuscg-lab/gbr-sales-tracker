@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import {
@@ -18,6 +18,9 @@ import {
     RotateCcw,
     CreditCard,
     FileText,
+    SlidersHorizontal,
+    X,
+    Check,
 } from 'lucide-react';
 import { orderApi, OrderStatus, OrderRecord } from '../api/order';
 import { ConfirmCancelOrderModal } from '../components/orders/ConfirmCancelOrderModal';
@@ -26,31 +29,63 @@ import { AddPaymentModal } from '@/components/orders/AddPaymentModal';
 import { OrderDetailModal, OrderDetailRecord } from '@/components/orders/ViewDetailsModal';
 import { downloadInvoicePdf } from '@/utils/generateInvoicePdf';
 
-const STATUS_FILTERS: { label: string; value: string }[] = [
-    { label: 'Semua Status', value: '' },
-    { label: 'Belum Lunas (Unpaid)', value: 'UNPAID' },
-    { label: 'Sebagian (Partial)', value: 'PARTIALLY_PAID' },
-    { label: 'Lunas (Paid)', value: 'PAID' },
-    { label: 'Dibatalkan', value: 'CANCELLED' },
+type SortOption =
+    | 'REMAINING_DESC'
+    | 'REMAINING_ASC'
+    | 'ORDER_DATE_DESC'
+    | 'ORDER_DATE_ASC'
+    | 'DUE_DATE_ASC'
+    | 'DUE_DATE_DESC';
+
+const STATUS_OPTIONS: { label: string; value: OrderStatus }[] = [
+    { label: 'Unpaid', value: 'UNPAID' },
+    { label: 'Partially Paid', value: 'PARTIALLY_PAID' },
+    { label: 'Paid', value: 'PAID' },
+    { label: 'Cancelled', value: 'CANCELLED' },
+];
+
+const SORT_OPTIONS: { label: string; value: SortOption }[] = [
+    { label: 'Highest Remaining Amount', value: 'REMAINING_DESC' },
+    { label: 'Lowest Remaining Amount', value: 'REMAINING_ASC' },
+    { label: 'Latest Order Date', value: 'ORDER_DATE_DESC' },
+    { label: 'Oldest Order Date', value: 'ORDER_DATE_ASC' },
+    { label: 'Nearest Due Date', value: 'DUE_DATE_ASC' },
+    { label: 'Longest Due Date', value: 'DUE_DATE_DESC' },
 ];
 
 export const OrdersPage: React.FC = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
+    // Search state
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
+
+    // Modal Filter & Sort visibility
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+    // Active Filters & Sort State
+    const [selectedStatuses, setSelectedStatuses] = useState<OrderStatus[]>([]);
+    const [orderStartDate, setOrderStartDate] = useState('');
+    const [orderEndDate, setOrderEndDate] = useState('');
+    const [dueStartDate, setDueStartDate] = useState('');
+    const [dueEndDate, setDueEndDate] = useState('');
+    const [sortBy, setSortBy] = useState<SortOption>('ORDER_DATE_DESC');
+
+    // Temporary modal state (Draft sebelum apply)
+    const [tempStatuses, setSelectedTempStatuses] = useState<OrderStatus[]>([]);
+    const [tempOrderStartDate, setTempOrderStartDate] = useState('');
+    const [tempOrderEndDate, setTempOrderEndDate] = useState('');
+    const [tempDueStartDate, setTempDueStartDate] = useState('');
+    const [tempDueEndDate, setTempDueEndDate] = useState('');
+    const [tempSortBy, setTempSortBy] = useState<SortOption>('ORDER_DATE_DESC');
+
+    // Modals data state
     const [orderToCancel, setOrderToCancel] = useState<{
         id: string;
         orderNo: string;
     } | null>(null);
     const [orderToPay, setOrderToPay] = useState<OrderRecord | null>(null);
-
-    const [orderStartDate, setOrderStartDate] = useState('');
-    const [orderEndDate, setOrderEndDate] = useState('');
-    const [dueStartDate, setDueStartDate] = useState('');
-    const [dueEndDate, setDueEndDate] = useState('');
     const [orderForDetail, setOrderForDetail] = useState<OrderDetailRecord | null>(null);
 
     useEffect(() => {
@@ -60,38 +95,68 @@ export const OrdersPage: React.FC = () => {
         return () => clearTimeout(handler);
     }, [search]);
 
-    const isDateFiltered = Boolean(
-        orderStartDate || orderEndDate || dueStartDate || dueEndDate
-    );
+    // Buka Modal & Sinkronisasi state draft
+    const handleOpenModal = () => {
+        setSelectedTempStatuses([...selectedStatuses]);
+        setTempOrderStartDate(orderStartDate);
+        setTempOrderEndDate(orderEndDate);
+        setTempDueStartDate(dueStartDate);
+        setTempDueEndDate(dueEndDate);
+        setTempSortBy(sortBy);
+        setIsFilterModalOpen(true);
+    };
 
-    const handleResetFilters = () => {
-        setSearch('');
-        setStatusFilter('');
+    // Toggle multi-select status
+    const toggleTempStatus = (status: OrderStatus) => {
+        if (tempStatuses.includes(status)) {
+            setSelectedTempStatuses(tempStatuses.filter((s) => s !== status));
+        } else {
+            setSelectedTempStatuses([...tempStatuses, status]);
+        }
+    };
+
+    const handleApplyFilterSort = () => {
+        setSelectedStatuses(tempStatuses);
+        setOrderStartDate(tempOrderStartDate);
+        setOrderEndDate(tempOrderEndDate);
+        setDueStartDate(tempDueStartDate);
+        setDueEndDate(tempDueEndDate);
+        setSortBy(tempSortBy);
+        setIsFilterModalOpen(false);
+    };
+
+    const handleResetAll = () => {
+        setSelectedStatuses([]);
         setOrderStartDate('');
         setOrderEndDate('');
         setDueStartDate('');
         setDueEndDate('');
+        setSortBy('ORDER_DATE_DESC');
+
+        setSelectedTempStatuses([]);
+        setTempOrderStartDate('');
+        setTempOrderEndDate('');
+        setTempDueStartDate('');
+        setTempDueEndDate('');
+        setTempSortBy('ORDER_DATE_DESC');
     };
 
-    // Query Fetch Order
-    const { data: orders = [], isLoading } = useQuery({
-        queryKey: [
-            'orders',
-            debouncedSearch,
-            statusFilter,
-            orderStartDate,
-            orderEndDate,
-            dueStartDate,
-            dueEndDate,
-        ],
+    // Hitung jumlah filter yang sedang aktif
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (selectedStatuses.length > 0) count += selectedStatuses.length;
+        if (orderStartDate || orderEndDate) count += 1;
+        if (dueStartDate || dueEndDate) count += 1;
+        if (sortBy !== 'ORDER_DATE_DESC') count += 1;
+        return count;
+    }, [selectedStatuses, orderStartDate, orderEndDate, dueStartDate, dueEndDate, sortBy]);
+
+    // Fetch data orders (Fetch semua / berdasarkan search text)
+    const { data: rawOrders = [], isLoading } = useQuery({
+        queryKey: ['orders', debouncedSearch],
         queryFn: () =>
             orderApi.getAll({
                 search: debouncedSearch || undefined,
-                status: statusFilter || undefined,
-                startDate: orderStartDate || undefined,
-                endDate: orderEndDate || undefined,
-                dueStartDate: dueStartDate || undefined,
-                dueEndDate: dueEndDate || undefined,
             }),
     });
 
@@ -108,6 +173,93 @@ export const OrdersPage: React.FC = () => {
             alert(err.response?.data?.message || 'Gagal membatalkan pesanan');
         },
     });
+
+    // FILTER & SORTING DATA
+    const processedOrders = useMemo(() => {
+        let result = [...rawOrders];
+
+        // 1. Filter Multi-Status
+        if (selectedStatuses.length > 0) {
+            result = result.filter((item) => selectedStatuses.includes(item.status));
+        }
+
+        // 2. Filter Order Date
+        if (orderStartDate) {
+            const start = new Date(`${orderStartDate}T00:00:00.000Z`).getTime();
+            result = result.filter((item) => {
+                const dateVal = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+                return dateVal >= start;
+            });
+        }
+        if (orderEndDate) {
+            const end = new Date(`${orderEndDate}T23:59:59.999Z`).getTime();
+            result = result.filter((item) => {
+                const dateVal = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+                return dateVal <= end;
+            });
+        }
+
+        // 3. Filter Due Date
+        if (dueStartDate) {
+            const start = new Date(`${dueStartDate}T00:00:00.000Z`).getTime();
+            result = result.filter((item) => {
+                if (!item.dueDate) return false;
+                return new Date(item.dueDate).getTime() >= start;
+            });
+        }
+        if (dueEndDate) {
+            const end = new Date(`${dueEndDate}T23:59:59.999Z`).getTime();
+            result = result.filter((item) => {
+                if (!item.dueDate) return false;
+                return new Date(item.dueDate).getTime() <= end;
+            });
+        }
+
+        // 4. SORTING DATA
+        result.sort((a, b) => {
+            const remA = Math.max(0, a.totalAmount - (a.paidAmount || 0));
+            const remB = Math.max(0, b.totalAmount - (b.paidAmount || 0));
+
+            const orderDateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const orderDateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+            const dueDateA = a.dueDate ? new Date(a.dueDate).getTime() : null;
+            const dueDateB = b.dueDate ? new Date(b.dueDate).getTime() : null;
+
+            switch (sortBy) {
+                case 'REMAINING_DESC':
+                    return remB - remA;
+                case 'REMAINING_ASC':
+                    return remA - remB;
+                case 'ORDER_DATE_DESC':
+                    return orderDateB - orderDateA;
+                case 'ORDER_DATE_ASC':
+                    return orderDateA - orderDateB;
+                case 'DUE_DATE_ASC': // Nearest Due Date (terdekat duluan, item tanpa due date di bawah)
+                    if (dueDateA === null && dueDateB === null) return 0;
+                    if (dueDateA === null) return 1;
+                    if (dueDateB === null) return -1;
+                    return dueDateA - dueDateB;
+                case 'DUE_DATE_DESC': // Longest Due Date (terjauh duluan)
+                    if (dueDateA === null && dueDateB === null) return 0;
+                    if (dueDateA === null) return 1;
+                    if (dueDateB === null) return -1;
+                    return dueDateB - dueDateA;
+                default:
+                    return 0;
+            }
+        });
+
+        return result;
+    }, [
+        rawOrders,
+        selectedStatuses,
+        orderStartDate,
+        orderEndDate,
+        dueStartDate,
+        dueEndDate,
+        sortBy,
+    ]);
 
     const formatIDR = (val: number) =>
         Number(val).toLocaleString('id-ID', {
@@ -166,12 +318,12 @@ export const OrdersPage: React.FC = () => {
 
     return (
         <div className="flex flex-col h-[calc(100vh-8.5rem)] gap-4 sm:gap-6">
-            {/* 1. Header Bar (Diam / Tetap di atas) */}
+            {/* 1. Header Bar */}
             <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-800">
-                            Order List
+                        <h1 className=" text-xl md:text-2xl font-bold tracking-tight text-slate-800">
+                            Orders
                         </h1>
                     </div>
                     <p className="text-sm text-slate-500">
@@ -183,100 +335,59 @@ export const OrdersPage: React.FC = () => {
                 <button
                     type="button"
                     onClick={() => navigate('/orders/new')}
-                    className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                    className="hidden md:flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
                 >
                     <Plus size={18} />
                     <span>Create New Order</span>
                 </button>
             </div>
 
-            {/* 2. Baris Filter & Search (Diam / Tetap di atas) */}
-            <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <SearchBar
-                    search={search}
-                    setSearch={setSearch}
-                    text="Search Order No. or Customer Name..."
-                />
-                <div className="w-full sm:w-56">
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    >
-                        {STATUS_FILTERS.map((item) => (
-                            <option key={item.value} value={item.value}>
-                                {item.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-1">
-                <div className="flex flex-wrap items-center gap-4 text-xs">
-                    {/* Filter Order Date */}
-                    <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1">
-                            <Calendar size={13} className="text-blue-500" />
-                            Order Date:
-                        </span>
-                        <input
-                            type="date"
-                            value={orderStartDate}
-                            onChange={(e) => setOrderStartDate(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
-                            title="Dari tanggal pesanan"
-                        />
-                        <span className="text-slate-400">-</span>
-                        <input
-                            type="date"
-                            value={orderEndDate}
-                            min={orderStartDate}
-                            onChange={(e) => setOrderEndDate(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
-                            title="Sampai tanggal pesanan"
-                        />
-                    </div>
-
-                    {/* Filter Due Date */}
-                    <div className="flex items-center gap-1.5 border-l border-slate-200 pl-4">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1">
-                            <Calendar size={13} className="text-amber-500" />
-                            Due Date:
-                        </span>
-                        <input
-                            type="date"
-                            value={dueStartDate}
-                            onChange={(e) => setDueStartDate(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
-                            title="Dari tanggal tempo"
-                        />
-                        <span className="text-slate-400">-</span>
-                        <input
-                            type="date"
-                            value={dueEndDate}
-                            min={dueStartDate}
-                            onChange={(e) => setDueEndDate(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
-                            title="Sampai tanggal tempo"
-                        />
-                    </div>
+            {/* 2. Baris Search Bar & Button Filter & Sort (Sejajar di pojok kanan) */}
+            <div className="flex shrink-0 gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1">
+                    <SearchBar
+                        search={search}
+                        setSearch={setSearch}
+                        text="Search Order No. or Customer Name..."
+                    />
                 </div>
 
-                {/* Tombol Reset jika ada filter yang terpasang */}
-                {(isDateFiltered || statusFilter || search) && (
+                <div className="flex items-center gap-2">
+                    {/* Tombol Filter & Sort */}
                     <button
                         type="button"
-                        onClick={handleResetFilters}
-                        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                        onClick={handleOpenModal}
+                        className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors shadow-xs ${
+                            activeFilterCount > 0
+                                ? 'border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
                     >
-                        <RotateCcw size={12} />
-                        <span>Reset Filter</span>
+                        <SlidersHorizontal size={16} />
+                        <span className="hidden md:block">Filter & Sort</span>
+                        {activeFilterCount > 0 && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+                                {activeFilterCount}
+                            </span>
+                        )}
                     </button>
-                )}
+
+                    {/* Tombol Reset Cepat jika filter aktif */}
+                    {activeFilterCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleResetAll}
+                            className="flex cursor-pointer items-center gap-1 rounded-xl border border-slate-200 bg-white p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                            title="Reset All Filters"
+                        >
+                            <RotateCcw size={16} />
+                        </button>
+                    )}
+                </div>
             </div>
-            {/* 3. Area Scroll Tunggal: Hanya bagian daftar kartu ini yang bisa di-scroll */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+
+            {/* 3. Area Scroll Tunggal: Kartu Pesanan */}
+            <div className="flex-1 min-h-0 pr-1">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white py-16 text-slate-400">
                         <Loader2
@@ -287,20 +398,19 @@ export const OrdersPage: React.FC = () => {
                             Loading orders...
                         </span>
                     </div>
-                ) : orders.length === 0 ? (
+                ) : processedOrders.length === 0 ? (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-slate-400">
                         <ShoppingCart size={40} className="text-slate-300" />
                         <p className="mt-3 text-sm font-semibold text-slate-600">
                             No orders found
                         </p>
                         <p className="text-xs text-slate-400">
-                            Please create a new order or adjust your search
-                            filters.
+                            Please adjust your search, filter, or sorting criteria.
                         </p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 pb-4 md:grid-cols-2 lg:grid-cols-3">
-                        {orders.map((ord: OrderRecord) => {
+                        {processedOrders.map((ord: OrderRecord) => {
                             const remaining = Math.max(
                                 0,
                                 ord.totalAmount - (ord.paidAmount || 0)
@@ -426,7 +536,6 @@ export const OrdersPage: React.FC = () => {
 
                                     {/* Footer Action Buttons */}
                                     <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
-                                        {/* Tombol Tambah Payment di Pojok Kiri */}
                                         <button
                                             type="button"
                                             onClick={() => setOrderToPay(ord)}
@@ -446,9 +555,7 @@ export const OrdersPage: React.FC = () => {
                                             <CreditCard size={18} />
                                         </button>
 
-                                        {/* Tombol Aksi Lainnya di Pojok Kanan */}
                                         <div className="flex items-center gap-1.5">
-                                            {/* Download Invoice */}
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -466,7 +573,6 @@ export const OrdersPage: React.FC = () => {
                                                 />
                                             </button>
 
-                                            {/* Detail */}
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -481,7 +587,6 @@ export const OrdersPage: React.FC = () => {
                                                 />
                                             </button>
 
-                                            {/* Edit */}
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -498,7 +603,6 @@ export const OrdersPage: React.FC = () => {
                                                 <Edit size={18} />
                                             </button>
 
-                                            {/* Cancel */}
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -530,6 +634,177 @@ export const OrdersPage: React.FC = () => {
                 )}
             </div>
 
+            {/* 4. Modal Dialog Filter & Sort */}
+            {isFilterModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+                        onClick={() => setIsFilterModalOpen(false)}
+                    />
+
+                    {/* Modal Content */}
+                    <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                                <SlidersHorizontal size={18} className="text-blue-600" />
+                                <h3 className="text-base font-bold text-slate-800">
+                                    Filter & Sort Orders
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsFilterModalOpen(false)}
+                                className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="mt-4 space-y-5 text-sm">
+                            {/* A. SORT OPTIONS */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                    Sort By
+                                </label>
+                                <select
+                                    value={tempSortBy}
+                                    onChange={(e) => setTempSortBy(e.target.value as SortOption)}
+                                    className="cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                >
+                                    {SORT_OPTIONS.map((item) => (
+                                        <option key={item.value} value={item.value}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* B. MULTI-SELECT STATUS */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                    Status
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {STATUS_OPTIONS.map((item) => {
+                                        const isSelected = tempStatuses.includes(item.value);
+                                        return (
+                                            <button
+                                                key={item.value}
+                                                type="button"
+                                                onClick={() => toggleTempStatus(item.value)}
+                                                className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                                                    isSelected
+                                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                                        : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span>{item.label}</span>
+                                                {isSelected && <Check size={14} className="text-blue-600" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* C. FILTER ORDER DATE */}
+                            <div>
+                                <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                    <Calendar size={13} className="text-blue-500" />
+                                    Order Date Range
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <span className="text-[11px] text-slate-400">From</span>
+                                        <input
+                                            type="date"
+                                            value={tempOrderStartDate}
+                                            onChange={(e) => setTempOrderStartDate(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="text-[11px] text-slate-400">To</span>
+                                        <input
+                                            type="date"
+                                            value={tempOrderEndDate}
+                                            min={tempOrderStartDate}
+                                            onChange={(e) => setTempOrderEndDate(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* D. FILTER DUE DATE */}
+                            <div>
+                                <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                    <Calendar size={13} className="text-amber-500" />
+                                    Due Date Range
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <span className="text-[11px] text-slate-400">From</span>
+                                        <input
+                                            type="date"
+                                            value={tempDueStartDate}
+                                            onChange={(e) => setTempDueStartDate(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="text-[11px] text-slate-400">To</span>
+                                        <input
+                                            type="date"
+                                            value={tempDueEndDate}
+                                            min={tempDueStartDate}
+                                            onChange={(e) => setTempDueEndDate(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Action Buttons */}
+                        <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedTempStatuses([]);
+                                    setTempOrderStartDate('');
+                                    setTempOrderEndDate('');
+                                    setTempDueStartDate('');
+                                    setTempDueEndDate('');
+                                    setTempSortBy('ORDER_DATE_DESC');
+                                }}
+                                className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+                            >
+                                <RotateCcw size={13} />
+                                <span>Reset Modal</span>
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFilterModalOpen(false)}
+                                    className="cursor-pointer rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleApplyFilterSort}
+                                    className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal Dialog Konfirmasi Batal */}
             <ConfirmCancelOrderModal
                 isOpen={!!orderToCancel}
@@ -542,6 +817,7 @@ export const OrdersPage: React.FC = () => {
                     }
                 }}
             />
+
             {/* Modal Dialog Tambah Pembayaran */}
             <AddPaymentModal
                 isOpen={!!orderToPay}
@@ -549,12 +825,22 @@ export const OrdersPage: React.FC = () => {
                 onClose={() => setOrderToPay(null)}
             />
 
-            {/* {Modal Order Detail} */}
+            {/* Modal Order Detail */}
             <OrderDetailModal
                 isOpen={!!orderForDetail}
                 order={orderForDetail}
                 onClose={() => setOrderForDetail(null)}
             />
+            {/* Tombol Create New Order Sticky Bulat (Hanya tampil di Mobile View) */}
+            <button
+                type="button"
+                onClick={() => navigate('/orders/new')}
+                className="fixed bottom-6 right-6 z-40 flex h-14 w-14 sm:hidden cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-95 transition-all focus:outline-none"
+                title="Create New Order"
+                aria-label="Create New Order"
+            >
+                <Plus size={28} />
+            </button>
         </div>
     );
 };

@@ -9,7 +9,8 @@ import {
     LogOut,
     X,
     ChevronDown,
-    Tag
+    Tag,
+    Receipt
 } from 'lucide-react';
 import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
     { label: 'Customers', path: '/customers', icon: Users },
     { label: 'Products', path: '/products', icon: Package },
     { label: 'Prices', path: '/prices', icon: Tag },
+    { label: 'Expenses', path: '/expenses', icon: Receipt },
 
 ]
 
@@ -69,13 +71,13 @@ export const AppLayout: React.FC = () => {
                         />
                     </div>
                     <div>
-                        <h1 className="text-md font-bold tracking-wide text-slate-800">GBR Fishing</h1>
-                        <p className="text-[12px] text-slate-600 font-medium leading-none">Sales Tracking System</p>
+                        <h1 className="text-sm md:text-md font-bold tracking-wide text-slate-800">GBR Fishing</h1>
+                        <p className="text-[10px] md:text-[12px] text-slate-600 font-medium leading-none">Sales Tracking System</p>
                     </div>
                 </div>
                 <button
                     type="button"
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden hover:cursor-pointer"
+                    className="rounded-lg py-1.5 pl-3 text-slate-500 hover:bg-slate-100 lg:hidden hover:cursor-pointer"
                     onClick={() => setSidebarOpen(false)}
                 >
                     <X size={20} />
@@ -104,7 +106,7 @@ export const AppLayout: React.FC = () => {
 
         {/* User Footer Profile & Logout */}
                 <div className="border-t text-[11px] text-slate-600 border-slate-200 p-4">
-                    <p>GBR Fishing © 2026. All rights reserved.</p>
+                    <p>© 2026 GBR Fishing. All rights reserved.</p>
                 </div>
             </aside>
 

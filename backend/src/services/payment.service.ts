@@ -3,7 +3,6 @@ import { AppError } from "../errors/AppError";
 import { paymentRepository } from "../repositories/payment.repository";
 import { CreatePaymentDTO, PaymentFilterDTO } from "../types/payment.type";
 import { orderRepository } from "../repositories/order.repository";
-import { customerService } from "./customer.service";
 import { prisma } from "../config/prisma";
 import { customerRepository } from "../repositories/customer.repository";
 import { generateReceiptNo } from "../utils/generateReceiptNo";

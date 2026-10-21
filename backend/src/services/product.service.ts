@@ -1,17 +1,17 @@
-import { AppError } from "../errors/AppError";
-import { productRepository } from "../repositories/product.repository";
-import { CreateProductDTO, UpdateProductDTO } from "../types/product.types";
-import { generateProductCode } from "../utils/generateProductCode";
+import { AppError } from '../errors/AppError';
+import { productRepository } from '../repositories/product.repository';
+import { CreateProductDTO, UpdateProductDTO } from '../types/product.types';
+import { generateProductCode } from '../utils/generateProductCode';
 
 export class ProductService {
-    async getAllProducts(search?:string) {
+    async getAllProducts(search?: string) {
         return productRepository.findMany(search);
     }
 
-    async getProductById(id:string) {
+    async getProductById(id: string) {
         const product = await productRepository.findById(id);
         if (!product) {
-            throw new AppError("Product tidak ditemukan", 404);
+            throw new AppError('Product tidak ditemukan', 404);
         }
         return product;
     }
@@ -20,123 +20,89 @@ export class ProductService {
         const trimmedName = data.name.trim();
         const trimmedBaseUnit = data.baseUnit.trim();
 
-        if (!trimmedName) throw new AppError("Nama produk wajib diisi", 400);
-        if (!trimmedBaseUnit) throw new AppError("Unit Dasar wajib diisi", 400);
+        if (!trimmedName) throw new AppError('Nama produk wajib diisi', 400);
+        if (!trimmedBaseUnit)
+            throw new AppError('Satuan dasar (base unit) wajib diisi', 400);
 
-        if(data.basePrice < 0 || data.basePrice === undefined) throw new AppError("Harga dasar tidak boleh negatif", 400);
+        const costPrice = Number(data.costPrice ?? 0);
+        if (isNaN(costPrice) || costPrice < 0) {
+            throw new AppError('HPP (Harga Modal) tidak boleh negatif', 400);
+        }
 
-        const code = await generateProductCode();
+        // Auto-generate code jika tidak ada
+        const code = data.code?.trim() || (await generateProductCode());
+
+        const existingCode = await productRepository.findByCode(code);
+        if (existingCode) {
+            throw new AppError('Kode produk sudah digunakan', 409);
+        }
 
         const existingName = await productRepository.findByName(trimmedName);
-        
-        if (existingName) throw new AppError("Nama produk sudah terdaftar",409);
-
-        if(data.additionalUnits && data.additionalUnits.length > 0) {
-            
-            const unitNames = new Set<string>();
-            unitNames.add(trimmedBaseUnit.toLocaleLowerCase());
-
-            for(const unit of data.additionalUnits) {
-                const uName = unit.unitName?.trim();
-
-                if(!uName) throw new AppError("Nama satuan tidak boleh kosong!", 400);
-
-
-                if (unitNames.has(uName.toLowerCase())) {
-                    throw new AppError(`Satuan ${uName} sudah terdaftar`, 400);
-                }
-
-                unitNames.add(uName.toLowerCase());
-
-                if(unit.conversionQty <= 1) {
-                    throw new AppError(`Unit konversi ${unit.unitName} harus lebih dari 1`, 400);
-                }
-
-                if (unit.price < 0) {
-                    throw new AppError(`Harga untuk satuan ${unit.unitName} tidak boleh negatif`, 400);
-                }
-            }
+        if (existingName) {
+            throw new AppError('Nama produk sudah terdaftar', 409);
         }
-        
+
         return productRepository.create({
             code,
             name: trimmedName,
             baseUnit: trimmedBaseUnit,
-            basePrice: data.basePrice,
-            additionalUnits: data.additionalUnits?.map((unit)=> ({
-                unitName: unit.unitName.trim(),
-                conversionQty: unit.conversionQty,
-                price: unit.price,
-            })),
+            costPrice, // <-- Kirim ke repository
+            additionalUnits: data.additionalUnits,
         });
     }
 
-    async updateProduct (id: string, data: UpdateProductDTO) {
+    async updateProduct(id: string, data: UpdateProductDTO) {
         const product = await productRepository.findById(id);
-        if(!product) {
-            throw new AppError("Product tidak ditemukan", 404);
+        if (!product) {
+            throw new AppError('Produk tidak ditemukan', 404);
         }
+
+        const updatePayload: UpdateProductDTO = {};
 
         if (data.name !== undefined) {
             const trimmedName = data.name.trim();
-
-            if (!trimmedName) throw new AppError("Nama produk wajib diisi",400);
+            if (!trimmedName)
+                throw new AppError('Nama produk tidak boleh kosong', 400);
 
             const existing = await productRepository.findByName(trimmedName);
             if (existing && existing.id !== id) {
-                throw new AppError("Nama produk sudah digunakan", 409);
+                throw new AppError(
+                    'Nama produk sudah digunakan oleh produk lain',
+                    409
+                );
             }
-            data.name = trimmedName;
+            updatePayload.name = trimmedName;
         }
 
         if (data.baseUnit !== undefined) {
             const trimmedBaseUnit = data.baseUnit.trim();
-            if (!trimmedBaseUnit) throw new AppError ("Base unit tidak boleh kosong", 400);
-            data.baseUnit = trimmedBaseUnit;
+            if (!trimmedBaseUnit)
+                throw new AppError('Satuan dasar tidak boleh kosong', 400);
+            updatePayload.baseUnit = trimmedBaseUnit;
         }
 
-        if (data.basePrice !== undefined) {
-            if (data.basePrice < 0 || isNaN(data.basePrice)) throw new AppError("Harga dasar tidak valid",400)
+        if (data.costPrice !== undefined) {
+            const costPrice = Number(data.costPrice);
+            if (isNaN(costPrice) || costPrice < 0) {
+                throw new AppError(
+                    'HPP (Harga Modal) tidak boleh negatif',
+                    400
+                );
+            }
+            updatePayload.costPrice = costPrice; // <-- Kirim update HPP
         }
 
         if (data.additionalUnits !== undefined) {
-            const effectiveBaseUnit = (data.baseUnit ?? product.baseUnit).toLowerCase();
-            const unitNames = new Set<string>();
-            unitNames.add(effectiveBaseUnit);
-
-            for (const unit of data.additionalUnits) {
-                const uName = unit.unitName?.trim();
-                if (!uName) {
-                    throw new AppError("Nama satuan tambahan wajib diisi", 400);
-                }
-
-                const lowerUName = uName.toLowerCase();
-                if (unitNames.has(lowerUName)) {
-                    throw new AppError(`Satuan '${uName}' terduplikasi atau sama dengan Base Unit`, 400);
-                }
-                unitNames.add(lowerUName);
-
-                if (unit.conversionQty === undefined || unit.conversionQty <= 1) {
-                    throw new AppError(`Faktor konversi untuk satuan '${uName}' harus lebih besar dari 1`,400);
-                }
-
-                if (unit.price === undefined || unit.price < 0) {
-                    throw new AppError(`Harga untuk satuan '${uName}' tidak boleh negatif`, 400);
-                }
-
-                unit.unitName = uName;
-                unit.conversionQty = unit.conversionQty;
-                unit.price = unit.price;
-            }
+            updatePayload.additionalUnits = data.additionalUnits;
         }
 
-        return productRepository.update(id,data);
+        return productRepository.update(id, updatePayload);
     }
 
-    async deleteProduct(id:string) {
+    async deleteProduct(id: string) {
         const product = await productRepository.findById(id);
-        if(!product) {
-            throw new AppError("Product tidak ditemukan", 404);
+        if (!product) {
+            throw new AppError('Product tidak ditemukan', 404);
         }
         return productRepository.delete(id);
     }

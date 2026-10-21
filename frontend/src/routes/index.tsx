@@ -8,6 +8,8 @@ import { ProductsPage } from "@/pages/ProductPage";
 import { PriceMatrixPage } from "@/pages/PriceMatrixPage";
 import { OrderFormPage } from "@/pages/OrderFormPage";
 import { OrdersPage } from "@/pages/OrdersPage";
+import { PaymentsPage } from "@/pages/PaymentPage";
+import { ExpensesPage } from "@/pages/ExpensePage";
 
 
 const DashboardPage = () => <div className="text-xl font-bold">Ringkasan Dashboard</div>;
@@ -32,6 +34,8 @@ export const AppRoutes: React.FC = () => {
                         <Route path="/customers" element={<CustomersPage />} />
                         <Route path="/products" element={<ProductsPage />} />
                         <Route path="/prices" element={<PriceMatrixPage/>}/>
+                        <Route path="/payments" element={<PaymentsPage/>}/>
+                        <Route path="/expenses" element={<ExpensesPage/>}/> 
                     </Route>
                 </Route>
 

@@ -24,35 +24,35 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
     });
 };
 
- //Watermark
-    const renderWatermark = (doc: jsPDF, text: string) => {
-        // Simpan konfigurasi grafis saat ini
-        doc.saveGraphicsState();
+//Watermark
+const renderWatermark = (doc: jsPDF, text: string) => {
+    // Simpan konfigurasi grafis saat ini
+    doc.saveGraphicsState();
 
-        // Set transparansi (0.0 transparan penuh s/d 1.0 pekat)
-        // 0.12 s/d 0.15 sangat pas: terbaca jelas namun teks tabel di bawahnya tetap terlihat
-        doc.setGState(new (doc as any).GState({ opacity: 0.14 }));
+    // Set transparansi (0.0 transparan penuh s/d 1.0 pekat)
+    // 0.12 s/d 0.15 sangat pas: terbaca jelas namun teks tabel di bawahnya tetap terlihat
+    doc.setGState(new (doc as any).GState({ opacity: 0.14 }));
 
-        // Konfigurasi font & warna cap/watermark (merah / emerald lembut)
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(60);
-        doc.setTextColor(16, 185, 129); // Merah (#dc2626) atau ganti [16, 185, 129] untuk warna emerald
+    // Konfigurasi font & warna cap/watermark (merah / emerald lembut)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(60);
+    doc.setTextColor(16, 185, 129); // Merah (#dc2626) atau ganti [16, 185, 129] untuk warna emerald
 
-        // Ambil titik tengah halaman A4 (lebar 210mm, tinggi 297mm)
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const centerX = pageWidth / 2;
-        const centerY = pageHeight / 2;
+    // Ambil titik tengah halaman A4 (lebar 210mm, tinggi 297mm)
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const centerX = pageWidth / 2;
+    const centerY = pageHeight / 2;
 
-        // Cetak teks miring 35 derajat tepat di tengah
-        doc.text(text, centerX, centerY, {
-            align: 'center',
-            angle: 35,
-        });
+    // Cetak teks miring 35 derajat tepat di tengah
+    doc.text(text, centerX, centerY, {
+        align: 'center',
+        angle: 35,
+    });
 
-        // Kembalikan konfigurasi grafis ke normal agar tidak mempengaruhi elemen lain
-        doc.restoreGraphicsState();
-    };
+    // Kembalikan konfigurasi grafis ke normal agar tidak mempengaruhi elemen lain
+    doc.restoreGraphicsState();
+};
 
 export const downloadInvoicePdf = async (order: OrderRecord) => {
     const doc = new jsPDF({
@@ -122,8 +122,8 @@ export const downloadInvoicePdf = async (order: OrderRecord) => {
             [
                 'No',
                 'Deskripsi Barang',
-                'Qty',
-                'Unit',
+                'Qty.',
+                'Satuan',
                 'Harga Satuan',
                 'Subtotal',
             ],
@@ -149,41 +149,108 @@ export const downloadInvoicePdf = async (order: OrderRecord) => {
             5: { halign: 'right', cellWidth: 35 },
         },
     });
+    let totalAmountItems: number = 0;
 
+    order.items?.forEach((item) => {
+        totalAmountItems += item.quantity * item.unitPrice;
+    });
     // Ambil posisi Y akhir tabel barang
-    const finalY = (doc as any).lastAutoTable?.finalY || 80;
+    const finalY =
+        (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+            ?.finalY ?? 80;
 
-    // Ringkasan Finansial di Bawah Tabel
-    const summaryX = 140;
-    let cursorY = finalY + 8;
+    // Ringkasan Finansial di Bawah Tabel\
+    const summaryLabelX = 130;
+    const summaryColonX = 160;
+    let rightY = finalY + 8;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = 14;
+    const rightEdgeX = pageWidth - rightMargin - 3;
+    doc.setFontSize(9);
+
+    const renderSummaryRow = (
+        label: string,
+        valueStr: string,
+        isBold = false
+    ) => {
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.text(label, summaryLabelX, rightY);
+        doc.text(':', summaryColonX, rightY);
+        // align: 'right' meratakan teks ke batas kanan tabel (196mm)
+        doc.text(valueStr, rightEdgeX, rightY, { align: 'right' });
+        rightY += 5;
+    };
+
+    renderSummaryRow('Total Belanja', formatRupiah(totalAmountItems));
+    renderSummaryRow('Ongkos Kirim', formatRupiah(order.deliveryFee || 0));
+    renderSummaryRow('Total Tagihan', formatRupiah(order.totalAmount), true);
+    renderSummaryRow('Jumlah Terbayar', formatRupiah(order.paidAmount || 0));
+    doc.setDrawColor(0);
+    doc.line(summaryLabelX, rightY - 1, rightEdgeX, rightY - 1);
+    rightY += 5;
+
+    renderSummaryRow('Sisa Tagihan', formatRupiah(remaining), true);
+
+    let leftY = finalY + 8;
+
+    // Catatan Khusus Pesanan (jika ada)
+    if (order.notes) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Catatan: ${order.notes}`, 14, leftY);
+        leftY += 6;
+    }
+
+    // Judul Petunjuk Pembayaran
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Petunjuk Pembayaran:', 14, leftY);
+    leftY += 4.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text('Total Tagihan', summaryX, cursorY);
-    doc.text(`: ${formatRupiah(order.totalAmount)}`, summaryX + 32, cursorY);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Pembayaran dapat ditransfer melalui rekening : ', 14, leftY);
+    leftY += 4;
+    doc.text('• Bank BCA     : 8480163720 a/n ELVINA', 14, leftY);
+    leftY += 5.5;
 
-    cursorY += 5;
-    doc.text('Jumlah Terbayar', summaryX, cursorY);
-    doc.text(
-        `: ${formatRupiah(order.paidAmount || 0)}`,
-        summaryX + 32,
-        cursorY
-    );
-
-    cursorY += 6;
+    // Ketentuan Pembayaran
     doc.setFont('helvetica', 'bold');
-    doc.text('Sisa Tagihan', summaryX, cursorY);
-    doc.text(`: ${formatRupiah(remaining)}`, summaryX + 32, cursorY);
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Ketentuan Pembayaran:', 14, leftY);
+    leftY += 4;
 
-    // Catatan Order
-    if (order.notes) {
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text(`Catatan: ${order.notes}`, 14, finalY + 8);
-    }
-
-    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text(
+        `1. Harap sertakan nomor pesanan (${order.orderNo}) pada berita transfer`,
+        14,
+        leftY
+    );
+    leftY +=4;
+    doc.text(
+        `    untuk memudahkan pelacakan pembayaran.`,
+        14,
+        leftY
+    );
+    leftY += 4;
+    doc.text(
+        '2. Pembayaran dianggap sah apabila dana telah efektif masuk ke rekening kami.',
+        14,
+        leftY
+    );
+    leftY += 4;
+    doc.text(
+        '3. Faktur Penjualan bukan merupakan bukti pembayaran',
+        14,
+        leftY
+    );
+    leftY += 6;
 
     if (order.status === 'PAID') {
         renderWatermark(doc, '[ L U N A S ]');

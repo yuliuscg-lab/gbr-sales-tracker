@@ -14,11 +14,13 @@ export interface CreateProductDTO {
     code: string;
     name: string;
     baseUnit: string;
+    costPrice?: number;
     additionalUnits?: CreateProductUnitDTO[];
 }
 
 export interface UpdateProductDTO {
     name?: string;
     baseUnit?: string;
+    costPrice?: number;
     additionalUnits?: UpdateProductUnitDTO[];
 }

@@ -53,7 +53,7 @@ api.interceptors.response.use(
 
         //If unauthorized and we haven't already retried this request
         if(error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-            if (originalRequest.url?.includes('/auth/login')) {
+            if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
                 return Promise.reject(error);
             }
 
@@ -90,8 +90,8 @@ api.interceptors.response.use(
                 processQueue(refreshErr,null);
                 useAuthStore.getState().logout();
 
-                if(window.location.pathname !== '/login') {
-                    window.location.href = 'login';
+                if(typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                    window.location.replace('/login');
                 }
 
                 return Promise.reject(refreshErr);

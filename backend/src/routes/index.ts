@@ -7,6 +7,7 @@ import orderRouter from "./order.route";
 import productRouter from "./product.route";
 import paymentRouter from "./payment.route";
 import priceMatrixRouter from "./priceMatrix.route";
+import expenseRouter from "./expense.route";
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use("/orders", orderRouter);
 router.use("/products", productRouter);
 router.use("/payments", paymentRouter);
 router.use("/price-matrix", priceMatrixRouter);
+router.use("/expenses", expenseRouter);
 
 export default router;
