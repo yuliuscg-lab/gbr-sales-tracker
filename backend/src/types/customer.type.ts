@@ -2,13 +2,24 @@ export interface CreateCustomerDTO {
     name: string;
     phone?:string|null;
     notes?:string|null;
-    maxUnpaidOrders?:number;
+    totalOrders:number;
+    unpaidOrdersCount:number;
+    address?:string|null;
+    subdistrict?:string|null;
+    district?:string|null;
+    city?:string|null;
+    province?:string|null;
+    mapsUrl?:string|null;
 }
 
 export interface UpdateCustomerDTO {
     name?:string;
     phone?:string|null;
     notes?:string|null;
-    maxUnpaidOrders?:number;
-    numOrders?:number;
+    address?:string|null;
+    subdistrict?:string|null;
+    district?:string|null;
+    city?:string|null;
+    province?:string|null;
+    mapsUrl?:string|null;
 }

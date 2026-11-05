@@ -20,10 +20,15 @@ export class AuthService {
         );
 
         if(!isMatch) {
-            throw new AppError("Email atau password salah!", 401);
+            throw new AppError("Username atau password salah!", 401);
         };
-        
-        return this.generateTokens(user.id);
+
+        const {accessToken, refreshToken } = await this.generateTokens(user.id);
+        return { accessToken, refreshToken, user: {
+            id:user.id,
+            username:user.username,
+            name:user.name,
+        } };
     }
 
     async generateTokens(userId:string) {
@@ -79,7 +84,13 @@ export class AuthService {
         }
 
         await authRepository.revokeRefreshToken(tokenRecord.id);
-        return this.generateTokens(userId);
+
+        const {accessToken, refreshToken:newRefreshToken } = await this.generateTokens(user.id);
+        return { accessToken, newRefreshToken, user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+        } };
 
     }
 

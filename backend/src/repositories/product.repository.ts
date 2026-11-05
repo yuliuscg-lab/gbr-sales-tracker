@@ -1,17 +1,21 @@
-import { Prisma } from "@prisma/client";
-import { prisma } from "../config/prisma";
-import { CreateProductDTO, CreateProductUnitDTO, UpdateProductDTO } from "../types/product.types";
+import { Prisma } from '@prisma/client';
+import { prisma } from '../config/prisma';
+import {
+    CreateProductDTO,
+    CreateProductUnitDTO,
+    UpdateProductDTO,
+} from '../types/product.types';
 
 export class ProductRepository {
-    async findMany(search?:string) {
+    async findMany(search?: string) {
         const where: Prisma.ProductWhereInput = {
             deletedAt: null,
         };
 
-        if(search) {
+        if (search) {
             where.OR = [
-                { code: { contains: search, mode: "insensitive"}},
-                { name: { contains: search, mode: "insensitive"}},
+                { code: { contains: search, mode: 'insensitive' } },
+                { name: { contains: search, mode: 'insensitive' } },
             ];
         }
 
@@ -19,35 +23,55 @@ export class ProductRepository {
             where,
             include: {
                 units: {
-                    orderBy: { conversionQty: "asc" },
+                    orderBy: { conversionQty: 'asc' },
                 },
             },
-            orderBy: { name: "asc" },
+            orderBy: { code: 'asc' },
         });
     }
 
-    async findById(id:string) {
+    async findById(id: string) {
         return prisma.product.findFirst({
-            where: { id, deletedAt:null },
+            where: { id, deletedAt: null },
             include: {
-                units : {
-                    orderBy: { conversionQty: "asc" },
+                units: {
+                    orderBy: { conversionQty: 'asc' },
                 },
             },
         });
     }
 
-    async findByName(name:string) {
-        return prisma.product.findFirst({
-            where: { name: {
-                equals: name, mode: "insensitive"
-            }, deletedAt:null},
+    async findByIds(ids: string[]) {
+        return prisma.product.findMany({
+            where: {
+                id: { in: ids },
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                costPrice: true,
+            },
         });
     }
 
-    async findByCode(code:string) {
+    async findByName(name: string) {
         return prisma.product.findFirst({
-            where: { code: { equals: code, mode: "insensitive"}, deletedAt:null },
+            where: {
+                name: {
+                    equals: name,
+                    mode: 'insensitive',
+                },
+                deletedAt: null,
+            },
+        });
+    }
+
+    async findByCode(code: string) {
+        return prisma.product.findFirst({
+            where: {
+                code: { equals: code, mode: 'insensitive' },
+                deletedAt: null,
+            },
         });
     }
 
@@ -56,7 +80,6 @@ export class ProductRepository {
             {
                 unitName: data.baseUnit,
                 conversionQty: 1,
-                price: data.basePrice,
             },
             ...(data.additionalUnits || []),
         ];
@@ -66,70 +89,140 @@ export class ProductRepository {
                 code: data.code,
                 name: data.name,
                 baseUnit: data.baseUnit,
-                basePrice: data.basePrice,
+                costPrice: data.costPrice ?? 0,
                 units: {
-                    create: unitsData,
+                    create: unitsData.map((u) => ({
+                        unitName: u.unitName,
+                        conversionQty: u.conversionQty,
+                    })),
                 },
             },
             include: {
                 units: {
-                    orderBy: { conversionQty: "asc" },
+                    orderBy: { conversionQty: 'asc' },
                 },
             },
         });
     }
 
-    async update(id: string, data: UpdateProductDTO) {
+    async createManyWithUnits(
+        items: {
+            code: string;
+            name: string;
+            baseUnit: string;
+            costPrice: number;
+            additionalUnits?: { unitName: string; conversionQty: number }[];
+        }[]
+    ) {
+        return prisma.$transaction(async (tx) => {
+            const createdProducts = [];
 
-        return prisma.$transaction(async (tx)=> {
+            for (const item of items) {
+                // Susun unit bawaan (factor = 1) dan unit tambahan
+                const unitsData = [
+                    {
+                        unitName: item.baseUnit,
+                        conversionQty: 1,
+                    },
+                    ...(item.additionalUnits || []),
+                ];
+
+                const product = await tx.product.create({
+                    data: {
+                        code: item.code,
+                        name: item.name,
+                        baseUnit: item.baseUnit,
+                        costPrice: item.costPrice,
+                        units: {
+                            create: unitsData,
+                        },
+                    },
+                    include: {
+                        units: true,
+                    },
+                });
+
+                createdProducts.push(product);
+            }
+
+            return createdProducts;
+        });
+    }
+
+    async update(id: string, data: UpdateProductDTO) {
+        return prisma.$transaction(async (tx) => {
             const current = await tx.product.findUniqueOrThrow({
                 where: { id },
                 include: {
-                    units: true
-                }
+                    units: true,
+                },
             });
 
             const effectiveBaseUnit = data.baseUnit ?? current.baseUnit;
 
             await tx.product.update({
                 where: { id },
-                data : {
-                    ...(data.name && { name: data.name}),
-                    ...(data.baseUnit && { baseUnit: data.baseUnit}),
-                    ...(data.basePrice !== undefined && { basePrice: data.basePrice})
+                data: {
+                    ...(data.name && { name: data.name }),
+                    ...(data.baseUnit && { baseUnit: data.baseUnit }),
+                    ...(data.costPrice !== undefined && {
+                        costPrice: data.costPrice,
+                    }),
                 },
             });
 
-            if (data.basePrice !== undefined || data.baseUnit !== undefined) {
-                const baseUnitRecord = current.units.find((u)=>u.conversionQty ===1);
-                if(baseUnitRecord) {
+            if (data.baseUnit && data.baseUnit !== current.baseUnit) {
+                const baseUnitRecord = current.units.find(
+                    (u) => u.conversionQty === 1
+                );
+                if (baseUnitRecord) {
                     await tx.productUnit.update({
-                        where: {id: baseUnitRecord.id},
-                        data: {
-                            ...(data.baseUnit && { unitName: data.baseUnit }),
-                            ...(data.basePrice !== undefined && {price:data.basePrice}),
-                        },
+                        where: { id: baseUnitRecord.id },
+                        data: { unitName: data.baseUnit },
                     });
                 }
             }
 
-            if(data.additionalUnits ) {
-                await tx.productUnit.deleteMany({
-                    where : {
-                        productId: id,
-                        conversionQty: { gt: 1 },
-                    },
-                });
+            if (data.additionalUnits) {
+                const incomingUnitNames = data.additionalUnits.map((u) =>
+                    u.unitName?.toLowerCase()
+                );
 
-                if (data.additionalUnits.length>0) {
-                    await tx.productUnit.createMany({
-                        data: data.additionalUnits.map((u)=> ({
-                            productId: id,
-                            unitName: u.unitName!,
-                            conversionQty: u.conversionQty!,
-                            price: u.price!, 
-                        })),
+                const unitsToDelete = current.units.filter(
+                    (u) =>
+                        u.conversionQty > 1 &&
+                        !incomingUnitNames.includes(u.unitName.toLowerCase())
+                );
+
+                if (unitsToDelete.length > 0) {
+                    await tx.productUnit.deleteMany({
+                        where: {
+                            id: { in: unitsToDelete.map((u) => u.id) },
+                        },
                     });
+                }
+
+                for (const unit of data.additionalUnits) {
+                    const existingUnit = current.units.find(
+                        (u) =>
+                            u.unitName.toLowerCase() ===
+                            unit.unitName?.toLowerCase()
+                    );
+
+                    if (existingUnit) {
+                        await tx.productUnit.update({
+                            where: { id: existingUnit.id },
+                            data: { conversionQty: unit.conversionQty },
+                        });
+                    } else {
+                        await tx.productUnit.create({
+                            data: {
+                                productId: id,
+                                unitName: unit.unitName!,
+                                conversionQty: unit.conversionQty!,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -138,7 +231,7 @@ export class ProductRepository {
                 include: {
                     units: {
                         orderBy: {
-                            conversionQty: "asc"
+                            conversionQty: 'asc',
                         },
                     },
                 },
@@ -146,9 +239,9 @@ export class ProductRepository {
         });
     }
 
-    async delete (id:string) {
+    async delete(id: string) {
         return prisma.product.update({
-            where: {id},
+            where: { id },
             data: {
                 deletedAt: new Date(),
             },

@@ -20,15 +20,24 @@ model User {
 }
 
 model Customer {
-  id                String    @id @default(cuid())
+  id                String                 @id @default(cuid())
   name              String
   phone             String?
-  maxUnpaidOrders   Int       @default(2) @map("max_unpaid_orders")
-  numOrders         Int       @default(0) @map("num_orders")
+  totalOrders       Int                    @default(0) @map("total_orders")
+  unpaidOrdersCount Int                    @default(0) @map("unpaid_orders_count")
   notes             String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+
+  address           String?
+  subdistrict       String?
+  district          String?
+  city              String?
+  province          String?
+  mapsUrl           String?                @map("maps_url")
+
+  customPrices      CustomerProductPrice[]
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  deletedAt         DateTime?              @map("deleted_at")
 
   orders Order[]
 
@@ -41,13 +50,18 @@ model Order {
   customer      Customer  @relation(fields: [customerId], references: [id])
   customerId    String    @map("customer_id")
   orderNo       String    @unique @map("order_no")
+  deliveryFee   Int       @default(0) @map("delivery_fee")
   totalAmount   Int       @map("total_amount")
   paidAmount    Int       @default(0) @map("paid_amount")
   dueDate       DateTime? @map("due_date")
   notes         String?
-  orderDate     DateTime  @default(now()) @map("order_date")
-  cancelReason String?   @map("cancel_reason")
+  deliveryDate  DateTime  @default(now()) @map("delivery_date")
 
+  shippedAt     DateTime? @map("shipped_at")
+  orderDate     DateTime  @default(now()) @map("order_date")
+  cancelReason  String?   @map("cancel_reason")
+  
+  deliveryStatus DeliveryStatus @default(NOT_SHIPPED) @map("delivery_status")
   status   OrderStatus @default(UNPAID)
   items    OrderItem[]
   payments Payment[]
@@ -55,7 +69,8 @@ model Order {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   cancelledAt DateTime? @map("cancelled_at")
-
+  
+  @@index([deliveryStatus])
   @@index([customerId])
   @@index([status])
   @@index([orderNo])
@@ -63,17 +78,17 @@ model Order {
 }
 
 model Product {
-  id          String  @id @default(cuid())
-  code        String  @unique
-  name        String  @unique
-  baseUnit    String 
-  basePrice   Int
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String    @unique
+  baseUnit  String
+  costPrice Int @default(0) @map("cost_price")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  units         ProductUnit[]
-  orderItems    OrderItem[]
+  units      ProductUnit[]
+  orderItems OrderItem[]
 
   @@index([code])
   @@index([name])
@@ -82,49 +97,68 @@ model Product {
 }
 
 model ProductUnit {
-  id          String    @id @default(cuid())
-  product     Product   @relation(fields: [productId], references: [id])
-  productId   String    @map("product_id")
-  unitName    String
-  conversionQty Int
-  price       Int
+  id             String                 @id @default(cuid())
+  product        Product                @relation(fields: [productId], references: [id])
+  productId      String                 @map("product_id")
+  unitName       String
+  conversionQty  Int
+  customerPrices CustomerProductPrice[]
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([productId])
   @@map("product_units")
 }
 
+model CustomerProductPrice {
+  id            String      @id @default(cuid())
+  customerId    String      @map("customer_id")
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  productUnitId String
+  productUnit   ProductUnit @relation(fields: [productUnitId], references: [id])
+  price         Int
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@unique([customerId, productUnitId])
+  @@index([customerId])
+  @@index([productUnitId])
+  @@map("customer_product_prices")
+}
+
 model OrderItem {
-  id        String  @id @default(cuid())
-  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId String  @map("order_id")
-  
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String @map("order_id")
+
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   productId String?
-  
-  name        String
-  unitName    String
-  quantity    Int
+
+  name          String
+  unitName      String
+  quantity      Int
   conversionQty Int
-  baseQty     Int
-  unitPrice   Int     @map("unit_price")
-  subTotal    Int     @map("sub_total")
+  baseQty       Int
+  unitPrice     Int    @map("unit_price")
+  costPrice     Int    @map("cost_price") @default(0)
+  subTotal      Int    @map("sub_total")
 
   @@map("order_items")
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  order         Order    @relation(fields: [orderId], references: [id])
-  orderId       String   @map("order_id")
-  receiptNo     String?  @unique @map("receipt_no")
+  id            String        @id @default(cuid())
+  order         Order         @relation(fields: [orderId], references: [id])
+  orderId       String        @map("order_id")
+  receiptNo     String?       @unique @map("receipt_no")
   amount        Int
-  paymentMethod PaymentMethod   @map("payment_method")
-  paymentDate   DateTime @default(now()) @map("paid_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  deletedAt     DateTime? @map("deleted_at")
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentDate   DateTime      @default(now()) @map("paid_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  deletedAt     DateTime?     @map("deleted_at")
   notes         String?
 
   @@index([orderId])
@@ -146,6 +180,21 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model Expense {
+  id          String   @id @default(cuid())
+  amount      Int
+  expenseDate DateTime @default(now()) @map("expense_date")
+  type        ExpenseType @map("expense_type") @default(OPERATIONAL)
+  category    String
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([expenseDate])
+  @@index([type])
+  @@map("expenses")
+}
+
 enum OrderStatus {
   PAID
   PARTIALLY_PAID
@@ -156,4 +205,14 @@ enum OrderStatus {
 enum PaymentMethod {
   TRANSFER
   CASH
+}
+
+enum ExpenseType {
+  OPERATIONAL
+  MATERIAL
+}
+
+enum DeliveryStatus {
+  NOT_SHIPPED
+  SHIPPED
 }

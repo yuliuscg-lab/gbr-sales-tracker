@@ -1,43 +1,43 @@
-import { OrderStatus, Prisma, PrismaClient } from "@prisma/client";
-import { prisma } from "../config/prisma";
-import { CreateCustomerDTO, UpdateCustomerDTO } from "../types/customer.type";
+import { OrderStatus, Prisma, PrismaClient } from '@prisma/client';
+import { prisma } from '../config/prisma';
+import { CreateCustomerDTO, UpdateCustomerDTO } from '../types/customer.type';
 
 export class CustomerRepository {
-    async findMany(search?:string) {
+    async findMany(search?: string) {
         return prisma.customer.findMany({
-            where:search ? {
-                OR:[
-                    {name:{contains:search, mode:"insensitive"}},
-                    {phone:{contains:search, mode:"insensitive"}},
-                ],
-            } : undefined,
-            orderBy: { createdAt:"desc"}
+            where: search
+                ? {
+                    OR: [
+                        { name: { contains: search, mode: 'insensitive' } },
+                        { phone: { contains: search, mode: 'insensitive' } },
+                    ],
+                }
+                : undefined,
+            orderBy: { createdAt: 'desc' },
         });
     }
 
-    async findById(id:string) {
+    async findById(id: string) {
         return prisma.customer.findUnique({
             where: { id },
             include: {
-                orders:{
-                    select: {
-                        id: true,
-                        orderNo: true,
-                        totalAmount:true,
-                        paidAmount:true,
-                        status: true,
-                        dueDate: true,
-                        createdAt: true
+                orders: {
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        items:true,
+                        payments: {
+                            where: { deletedAt: null },
+                            orderBy: { paymentDate: 'desc' },
+                        },
                     },
-                    orderBy: {orderDate: "desc"}
                 },
             },
         });
     }
 
-    findByName(name:string) {
+    findByName(name: string) {
         return prisma.customer.findFirst({
-            where: { name:{equals: name, mode: "insensitive"}},
+            where: { name: { equals: name, mode: 'insensitive' } },
         });
     }
 
@@ -47,36 +47,53 @@ export class CustomerRepository {
         });
     }
 
-    async update (id:string, data:UpdateCustomerDTO) {
+    async update(id: string, data: UpdateCustomerDTO) {
         return prisma.customer.update({
-            where: {id},
+            where: { id },
             data,
         });
     }
 
-    async calculateNumOrders(customerId:string, tx?: Prisma.TransactionClient):Promise<number> {
+    async syncOrderMetrics(
+        customerId: string,
+        tx?: Prisma.TransactionClient
+    ): Promise<{ totalOrders: number; unpaidOrdersCount: number }> {
         const client = tx || prisma;
-        const activeOrderCount = await client.order.count({
-            where : {
-                customerId,
-                status: {
-                    in: [OrderStatus.UNPAID, OrderStatus.PARTIALLY_PAID]
+
+        const [totalOrders, unpaidOrdersCount] = await Promise.all([
+            client.order.count({
+                where: {
+                    customerId,
+                    status: {
+                        not: OrderStatus.CANCELLED,
+                    },
                 },
-            },
-        });
+            }),
+            client.order.count({
+                where: {
+                    customerId,
+                    status: {
+                        in: [OrderStatus.UNPAID, OrderStatus.PARTIALLY_PAID],
+                    },
+                },
+            }),
+        ]);
 
         await client.customer.update({
-            where: { id : customerId },
-            data: { numOrders: activeOrderCount}
-        })
-        return activeOrderCount;
+            where: { id: customerId },
+            data: {
+                totalOrders,
+                unpaidOrdersCount,
+            },
+        });
+        return { totalOrders, unpaidOrdersCount };
     }
-    
-    async delete(id:string) {
+
+    async delete(id: string) {
         return prisma.customer.update({
-            where: {id},
-            data: { deletedAt: new Date()}
-        })
+            where: { id },
+            data: { deletedAt: new Date() },
+        });
     }
 }
 

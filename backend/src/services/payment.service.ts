@@ -3,7 +3,6 @@ import { AppError } from "../errors/AppError";
 import { paymentRepository } from "../repositories/payment.repository";
 import { CreatePaymentDTO, PaymentFilterDTO } from "../types/payment.type";
 import { orderRepository } from "../repositories/order.repository";
-import { customerService } from "./customer.service";
 import { prisma } from "../config/prisma";
 import { customerRepository } from "../repositories/customer.repository";
 import { generateReceiptNo } from "../utils/generateReceiptNo";
@@ -16,7 +15,27 @@ export class PaymentService {
     async getPaymentById (id: string) {
         const payment = await paymentRepository.findById(id);
         if (!payment) throw new AppError("Pembayaran tidak ditemukan",404);
-        return payment;
+
+        const formattedOrder = {
+            id: payment.order.id,
+            orderNo: payment.order.orderNo,
+            orderDate: payment.order.orderDate || payment.order.createdAt,
+            deliveryDate: payment.order.deliveryDate,
+            deliveryFee: Number(payment.order.deliveryFee || 0),
+            dueDate: payment.order.dueDate,
+            totalAmount: Number(payment.order.totalAmount),
+            paidAmount: Number(payment.order.paidAmount),
+            status: payment.order.status,
+            notes: payment.order.notes,
+            cancelReason: payment.order.cancelReason,
+            cancelledAt: payment.order.cancelledAt,
+            deliveryStatus: payment.order.deliveryStatus,
+            items: payment.order.items,
+            payments: payment
+        }
+        return {
+            ...payment,
+        order:formattedOrder};
     }
 
     async createPayment(data: CreatePaymentDTO) {
@@ -73,7 +92,7 @@ export class PaymentService {
                 }
             });
 
-            await customerRepository.calculateNumOrders(order.customerId, tx);
+            await customerRepository.syncOrderMetrics(order.customerId, tx);
 
             return payment;
         });
@@ -111,7 +130,7 @@ export class PaymentService {
                 }
             });
 
-            await customerRepository.calculateNumOrders(order.customerId, tx);
+            await customerRepository.syncOrderMetrics(order.customerId, tx);
         })
     }
 }
