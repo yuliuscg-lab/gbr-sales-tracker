@@ -1,10 +1,10 @@
-# 🎣 GBR Sales Tracker (Bait & Tackle Tracker)
+# 🎣 GBR Sales Tracker
 
 Aplikasi manajemen operasional penjualan, pencatatan piutang (bon tempo), pelacakan pengiriman, dan pemantauan laba rugi (*Profit & Loss*) yang dirancang khusus untuk UMKM toko & distributor umpan pancing.
 
 ---
 
-## 📌 Ringkasan Proyek
+## 📌 Ringkasan
 
 **GBR Sales Tracker** dibangun dengan pendekatan arsitektur modular berlapis (*Route → Controller → Service → Repository*) untuk memastikan keandalan data transaksi, pemisahan tanggung jawab kode yang bersih, serta kecepatan respon antarmuka kasir dan pemilik toko.
 
