@@ -20,6 +20,11 @@ export const productApi = {
         return res.data.data;
     },
 
+    async createMany(data: ProductFormData[]): Promise<{ count: number }> {
+        const res = await api.post<{ success: boolean; data: { count: number } }>('/products/mass-upload', { products: data });
+        return res.data.data;
+    },
+
     async update(id: string, data: ProductFormData): Promise<Product> {
         const res = await api.put<{ success: boolean; data: Product }>(`/products/${id}`, data);
         return res.data.data;

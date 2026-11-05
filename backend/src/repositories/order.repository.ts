@@ -1,6 +1,11 @@
 import { OrderStatus, Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
-import { CreateOrderDTO, OrderFilterParams, UpdateOrderDTO } from '../types/order.type';
+import {
+    CreateOrderDTO,
+    OrderFilterParams,
+    UpdateDeliveryStatusDTO,
+    UpdateOrderDTO,
+} from '../types/order.type';
 
 export class OrderRepository {
     async findMany(filters?: OrderFilterParams) {
@@ -68,11 +73,12 @@ export class OrderRepository {
                         id: true,
                         name: true,
                         phone: true,
+                        city:true,
                     },
                 },
                 items: true,
                 payments: {
-                    where: { deletedAt: null},
+                    where: { deletedAt: null },
                     orderBy: { paymentDate: 'desc' },
                 },
             },
@@ -110,7 +116,7 @@ export class OrderRepository {
                 status: data.status || OrderStatus.UNPAID,
                 dueDate: data.dueDate,
                 notes: data.notes,
-                deliveryFee:data.deliveryFee,
+                deliveryFee: data.deliveryFee,
                 deliveryDate: data.deliveryDate,
                 items: {
                     create: data.items.map((item) => ({
@@ -156,6 +162,20 @@ export class OrderRepository {
                 customer: {
                     select: { id: true, name: true, phone: true },
                 },
+                items: true,
+            },
+        });
+    }
+
+    async updateDeliveryStatus(id: string, data: UpdateDeliveryStatusDTO) {
+        return prisma.order.update({
+            where: { id },
+            data: {
+                deliveryStatus: data.deliveryStatus,
+                shippedAt: data.shippedAt,
+            },
+            include: {
+                customer: true,
                 items: true,
             },
         });

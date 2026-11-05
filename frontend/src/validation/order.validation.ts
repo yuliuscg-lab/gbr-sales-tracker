@@ -21,7 +21,7 @@ export const createOrderSchema = z.object({
     dueDate: z.string().optional(),
     notes: z.string().optional(),
     deliveryFee: z.coerce.number().min(0, 'Ongkos kirim tidak boleh negatif'),
-    deliveryDate: z.string(),
+    deliveryDate: z.string().optional(),
     items: z.array(orderItemSchema).min(1, 'Minimal harus ada 1 item barang yang dipesan'),
 });
 

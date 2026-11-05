@@ -25,6 +25,7 @@ export class PriceMatrixRepository {
             code: prod.code,
             name: prod.name,
             baseUnit: prod.baseUnit,
+            costPrice:Number(prod.costPrice || 0),
             units: prod.units.map((unit) => ({
                 productUnitId: unit.id,
                 unitName: unit.unitName,

@@ -1,4 +1,4 @@
-import { OrderStatus } from '@prisma/client';
+import { DeliveryStatus, OrderStatus } from '@prisma/client';
 
 export interface CreateOrderItemDTO {
     productId?: string | null;
@@ -48,7 +48,7 @@ export interface CreateOrderInput {
     dueDate?: string | null;
     notes?: string | null;
     deliveryFee: number;
-    deliveryDate:Date;
+    deliveryDate: Date;
     items: CreateOrderItemInput[];
 }
 
@@ -60,4 +60,9 @@ export interface OrderFilterParams {
     endDate?: string;
     dueStartDate?: string;
     dueEndDate?: string;
+}
+
+export interface UpdateDeliveryStatusDTO {
+    deliveryStatus: DeliveryStatus;
+    shippedAt?: Date | null;
 }

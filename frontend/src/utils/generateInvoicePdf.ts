@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { OrderRecord } from '../api/order';
+import { downloadPdfAsJpg } from './pdfToJpg';
 
 const formatRupiah = (val: number | string) =>
     `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
@@ -54,7 +55,7 @@ const renderWatermark = (doc: jsPDF, text: string) => {
     doc.restoreGraphicsState();
 };
 
-export const downloadInvoicePdf = async (order: OrderRecord) => {
+export const generateInvoiceDocument = async (order: OrderRecord) => {
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -181,7 +182,7 @@ export const downloadInvoicePdf = async (order: OrderRecord) => {
         rightY += 5;
     };
 
-    renderSummaryRow('Total Belanja', formatRupiah(totalAmountItems));
+    renderSummaryRow('Jumlah', formatRupiah(totalAmountItems));
     renderSummaryRow('Ongkos Kirim', formatRupiah(order.deliveryFee || 0));
     renderSummaryRow('Total Tagihan', formatRupiah(order.totalAmount), true);
     renderSummaryRow('Jumlah Terbayar', formatRupiah(order.paidAmount || 0));
@@ -202,59 +203,56 @@ export const downloadInvoicePdf = async (order: OrderRecord) => {
         leftY += 6;
     }
 
+    const boxX = 14;
+    const boxY = leftY;
+    const boxWidth = 95;
+    const boxHeight = 22;
+
+    doc.setFillColor(255, 255, 255);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+
     // Judul Petunjuk Pembayaran
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(30, 41, 59);
-    doc.text('Petunjuk Pembayaran:', 14, leftY);
+    doc.text('Petunjuk Pembayaran:', boxX + 3.5, boxY + 7.5);
     leftY += 4.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text('Pembayaran dapat ditransfer melalui rekening : ', 14, leftY);
-    leftY += 4;
-    doc.text('• Bank BCA     : 8480163720 a/n ELVINA', 14, leftY);
-    leftY += 5.5;
+    doc.text(
+        'Pembayaran dapat ditransfer melalui rekening : ',
+        boxX + 3.5,
+        boxY + 12.5
+    );
+    doc.text('Bank BCA : 8480163720 a/n ELVINA', boxX + 3.5, boxY + 17.5);
 
-    // Ketentuan Pembayaran
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
-    doc.setTextColor(51, 65, 85);
-    doc.text('Ketentuan Pembayaran:', 14, leftY);
-    leftY += 4;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100);
+    doc.setTextColor(71, 85, 105);
     doc.text(
-        `1. Harap sertakan nomor pesanan (${order.orderNo}) pada berita transfer`,
+        '** Faktur Penjualan bukan merupakan bukti pembayaran **',
         14,
-        leftY
+        leftY + 22
     );
-    leftY +=4;
-    doc.text(
-        `    untuk memudahkan pelacakan pembayaran.`,
-        14,
-        leftY
-    );
-    leftY += 4;
-    doc.text(
-        '2. Pembayaran dianggap sah apabila dana telah efektif masuk ke rekening kami.',
-        14,
-        leftY
-    );
-    leftY += 4;
-    doc.text(
-        '3. Faktur Penjualan bukan merupakan bukti pembayaran',
-        14,
-        leftY
-    );
-    leftY += 6;
 
     if (order.status === 'PAID') {
         renderWatermark(doc, '[ L U N A S ]');
     }
     // Unduh Berkas PDF
+    return doc;
+};
+
+// Handler Download PDF
+export const downloadInvoicePdf = async (order: OrderRecord) => {
+    const doc = await generateInvoiceDocument(order);
     doc.save(`Invoice_${order.orderNo}.pdf`);
+};
+
+// Handler Download Gambar JPG
+export const downloadInvoiceJpg = async (order: OrderRecord) => {
+    const doc = await generateInvoiceDocument(order);
+    await downloadPdfAsJpg(doc, `Invoice_${order.orderNo}`);
 };

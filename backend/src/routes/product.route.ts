@@ -7,6 +7,7 @@ import { createProductSchema, updateProductSchema } from "../validation/product.
 const router = Router();
 
 router.use(authenticate);
+router.post("/mass-upload", productController.massUpload);
 router.get("/", productController.getAll);
 router.get("/:id", productController.getById);
 router.post("/", validate(createProductSchema), productController.create);

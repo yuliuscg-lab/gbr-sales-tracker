@@ -26,6 +26,14 @@ model Customer {
   totalOrders       Int                    @default(0) @map("total_orders")
   unpaidOrdersCount Int                    @default(0) @map("unpaid_orders_count")
   notes             String?
+
+  address           String?
+  subdistrict       String?
+  district          String?
+  city              String?
+  province          String?
+  mapsUrl           String?                @map("maps_url")
+
   customPrices      CustomerProductPrice[]
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
@@ -48,9 +56,12 @@ model Order {
   dueDate       DateTime? @map("due_date")
   notes         String?
   deliveryDate  DateTime  @default(now()) @map("delivery_date")
+
+  shippedAt     DateTime? @map("shipped_at")
   orderDate     DateTime  @default(now()) @map("order_date")
   cancelReason  String?   @map("cancel_reason")
-
+  
+  deliveryStatus DeliveryStatus @default(NOT_SHIPPED) @map("delivery_status")
   status   OrderStatus @default(UNPAID)
   items    OrderItem[]
   payments Payment[]
@@ -58,7 +69,8 @@ model Order {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   cancelledAt DateTime? @map("cancelled_at")
-
+  
+  @@index([deliveryStatus])
   @@index([customerId])
   @@index([status])
   @@index([orderNo])
@@ -198,4 +210,9 @@ enum PaymentMethod {
 enum ExpenseType {
   OPERATIONAL
   MATERIAL
+}
+
+enum DeliveryStatus {
+  NOT_SHIPPED
+  SHIPPED
 }

@@ -167,7 +167,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                             </div>
                             <p className="mt-0.5 text-rose-700">
                                 <strong>Reason :</strong>{' '}
-                                {order.cancelReason || 'Tidak ada alasan pembatalan yang dicantumkan.'}
+                                {order.cancelReason ||
+                                    'Tidak ada alasan pembatalan yang dicantumkan.'}
                             </p>
                         </div>
                     )}
@@ -184,10 +185,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                                     {order.customer?.name || 'Pelanggan Umum'}
                                 </span>
                                 {order.customer?.phone && (
-                                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                                        <Phone size={12} />
-                                        {order.customer.phone}
-                                    </span>
+                                    <a
+                                        href={`https://wa.me/${order.customer?.phone.replace(/\D/g, '')}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[12px] text-emerald-600 hover:underline"
+                                    >
+                                        <Phone size={10} />
+                                        <span>{order.customer?.phone}</span>
+                                    </a>
                                 )}
                             </div>
                         </div>
@@ -205,21 +211,39 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="border-b border-slate-100 bg-slate-50 text-[12px] font-bold tracking-wider text-slate-500">
                                         <tr>
-                                            <th className="px-3 py-2 text-center w-8">No.</th>
-                                            <th className="px-3 py-2">Product Name</th>
-                                            <th className="px-3 py-2 text-center">Qty</th>
-                                            <th className="px-3 py-2 text-center">Unit</th>
-                                            <th className="px-3 py-2 text-right">Price</th>
-                                            <th className="px-3 py-2 text-right">SubTotal</th>
+                                            <th className="px-3 py-2 text-center w-8">
+                                                No.
+                                            </th>
+                                            <th className="px-3 py-2">
+                                                Product Name
+                                            </th>
+                                            <th className="px-3 py-2 text-center">
+                                                Qty
+                                            </th>
+                                            <th className="px-3 py-2 text-center">
+                                                Unit
+                                            </th>
+                                            <th className="px-3 py-2 text-right">
+                                                Price
+                                            </th>
+                                            <th className="px-3 py-2 text-right">
+                                                SubTotal
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                                        {order.items && order.items.length > 0 ? (
+                                        {order.items &&
+                                        order.items.length > 0 ? (
                                             order.items.map((item, idx) => {
                                                 const subtotal =
-                                                    item.subTotal ?? item.quantity * item.unitPrice;
+                                                    item.subTotal ??
+                                                    item.quantity *
+                                                        item.unitPrice;
                                                 return (
-                                                    <tr key={item.id || idx} className="hover:bg-slate-50/50">
+                                                    <tr
+                                                        key={item.id || idx}
+                                                        className="hover:bg-slate-50/50"
+                                                    >
                                                         <td className="px-3 py-2.5 text-center text-slate-400 font-medium">
                                                             {idx + 1}
                                                         </td>
@@ -233,17 +257,24 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                                                             {item.unitName}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-right text-slate-600">
-                                                            {formatIDR(item.unitPrice)}
+                                                            {formatIDR(
+                                                                item.unitPrice
+                                                            )}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-right font-semibold text-slate-800">
-                                                            {formatIDR(subtotal)}
+                                                            {formatIDR(
+                                                                subtotal
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 );
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={6} className="px-3 py-4 text-center text-slate-400 italic">
+                                                <td
+                                                    colSpan={6}
+                                                    className="px-3 py-4 text-center text-slate-400 italic"
+                                                >
                                                     No order details.
                                                 </td>
                                             </tr>
@@ -264,7 +295,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {/* Delivery Fee */}
                             <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-2.5 text-xs">
-                                <span className="text-slate-600 font-medium">Delivery Fee :</span>
+                                <span className="text-slate-600 font-medium">
+                                    Delivery Fee :
+                                </span>
                                 <span className="font-semibold text-slate-800">
                                     {formatIDR(order.deliveryFee ?? 0)}
                                 </span>
@@ -272,9 +305,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
                             {/* Delivery Date */}
                             <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-2.5 text-xs">
-                                <span className="text-slate-600 font-medium">Delivery Date :</span>
+                                <span className="text-slate-600 font-medium">
+                                    Delivery Date :
+                                </span>
                                 <span className="font-semibold text-slate-800">
-                                    {formatDate(order.deliveryDate || order.dueDate)}
+                                    {formatDate(
+                                        order.deliveryDate || order.dueDate
+                                    )}
                                 </span>
                             </div>
                         </div>
@@ -300,7 +337,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                                 </span>
                             </div>
                             <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2 font-semibold">
-                                <span className="text-slate-700">Remaining Amount :</span>
+                                <span className="text-slate-700">
+                                    Remaining Amount :
+                                </span>
                                 <span
                                     className={`text-sm ${
                                         remaining > 0
@@ -331,7 +370,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     <div className="pt-2 space-y-2.5">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-slate-700 uppercase">
-                                <CreditCard size={13} className="text-slate-500" />
+                                <CreditCard
+                                    size={13}
+                                    className="text-slate-500"
+                                />
                                 <span>Payment History</span>
                             </div>
                             <span className="text-[11px] font-semibold text-slate-400">
@@ -357,7 +399,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                                                     className="text-blue-600"
                                                 />
                                                 <span className="font-mono text-xs font-bold text-slate-800">
-                                                    {pay.receiptNo || 'Kwitansi -'}
+                                                    {pay.receiptNo ||
+                                                        'Kwitansi -'}
                                                 </span>
                                             </div>
                                             <span className="text-[11px] flex items-center gap-1 text-slate-500">

@@ -16,11 +16,16 @@ import type { Customer } from '../types/customer.type';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { SearchBar } from '@/components/common/SearchBar';
+import { useNavigate } from 'react-router';
 
 export const CustomersPage: React.FC = () => {
+    const navigate = useNavigate();
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [customerToDelete, setCustomerToDelete] = useState<{id:string; name: string} | null>(null);
+    const [customerToDelete, setCustomerToDelete] = useState<{
+        id: string;
+        name: string;
+    } | null>(null);
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -108,18 +113,18 @@ export const CustomersPage: React.FC = () => {
         await saveMutation.mutateAsync(formData);
     };
 
-    const handleDeleteClick = (id: string, name:string) => {
-        setCustomerToDelete({id, name});
-    }
+    const handleDeleteClick = (id: string, name: string) => {
+        setCustomerToDelete({ id, name });
+    };
     const handleConfirmDelete = () => {
         if (customerToDelete) {
             deleteMutation.mutate(customerToDelete.id, {
                 onSettled: () => {
                     setCustomerToDelete(null);
-                }
+                },
             });
         }
-    }
+    };
 
     return (
         <div className="space-y-6">
@@ -151,7 +156,11 @@ export const CustomersPage: React.FC = () => {
             </div>
 
             {/* Search Bar */}
-            <SearchBar search={search} setSearch={setSearch} text="Search Name or Phone Number..." />
+            <SearchBar
+                search={search}
+                setSearch={setSearch}
+                text="Search Name or Phone Number..."
+            />
 
             {/* Customer Data Table */}
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
@@ -227,23 +236,33 @@ export const CustomersPage: React.FC = () => {
 
                                             {/* 2. Customer Name */}
                                             <td className="px-6 py-4">
-                                                <div className="font-semibold text-slate-800">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        navigate(
+                                                            `/customers/${cust.id}`
+                                                        )
+                                                    }
+                                                    className="cursor-pointer text-left font-semibold text-slate-800 hover:text-blue-600 hover:underline transition-colors focus:outline-none"
+                                                >
                                                     {cust.name}
-                                                </div>
+                                                </button>
                                             </td>
 
                                             {/* 3. Phone / Whatsapp */}
                                             <td className="px-6 py-4">
                                                 {cust.phone ? (
-                                                    <div className="flex items-center gap-1.5 text-slate-700">
-                                                        <Phone
-                                                            size={14}
-                                                            className="text-slate-400"
-                                                        />
+                                                    <a
+                                                        href={`https://wa.me/${cust.phone.replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1 text-xs md:text-sm text-emerald-600 hover:underline"
+                                                    >
+                                                        <Phone size={10} />
                                                         <span>
                                                             {cust.phone}
                                                         </span>
-                                                    </div>
+                                                    </a>
                                                 ) : (
                                                     <span className="text-xs text-slate-400">
                                                         -
@@ -330,20 +349,21 @@ export const CustomersPage: React.FC = () => {
                 title="Confirm Delete Customer"
                 message={
                     <span className="text-sm">
-                        Are you sure you want to delete customer<br/>
+                        Are you sure you want to delete customer
+                        <br />
                         <strong>{customerToDelete?.name}</strong>?
                     </span>
                 }
             />
             <button
-                            type="button"
-                            onClick={handleOpenCreateModal}
-                            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 sm:hidden cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-95 transition-all focus:outline-none"
-                            title="Add New Customer"
-                            aria-label="Add New Customer"
-                        >
-                            <Plus size={28} />
-                        </button>
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="fixed bottom-6 right-6 z-40 flex h-14 w-14 sm:hidden cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 active:scale-95 transition-all focus:outline-none"
+                title="Add New Customer"
+                aria-label="Add New Customer"
+            >
+                <Plus size={28} />
+            </button>
         </div>
     );
 };

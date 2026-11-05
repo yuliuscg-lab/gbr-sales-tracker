@@ -1,29 +1,44 @@
 import { z } from 'zod';
 
 export const customerSchema = z.object({
-    name: z
-        .string()
-        .trim()
-        .min(1, 'Nama pelanggan wajib diisi')
-        .max(100, 'Nama terlalu panjang'),
+    name: z.string().trim().min(1, 'Nama konsumen wajib diisi'),
     phone: z
         .string()
         .trim()
-        .optional()
-        .transform((val) => (val === '' ? undefined : val)),
+        .optional(),
     notes: z
         .string()
         .trim()
-        .optional()
-        .transform((val) => (val === '' ? undefined : val)),
-    totalOrders: z
-        .coerce
-        .number({ invalid_type_error: 'Harus berupa angka' })
-        .int('Harus bilangan bulat'),
-    unpaidOrdersCount: z
-        .coerce
-        .number({ invalid_type_error: 'Harus berupa angka' })
-        .int('Harus bilangan bulat')
+        .optional(),
+
+    // Field Alamat & Lokasi Baru
+    address: z
+        .string()
+        .trim()
+        .optional(),
+    subdistrict: z
+        .string()
+        .trim()
+        .optional(),
+    district: z
+        .string()
+        .trim()
+        .optional(),
+    city: z
+        .string()
+        .trim()
+        .optional(),
+    province: z
+        .string()
+        .trim()
+        .optional(),
+    mapsUrl: z
+        .string()
+        .trim()
+        .optional(),
+
+    totalOrders: z.coerce.number(),
+    unpaidOrdersCount: z.coerce.number(),
 });
 
 export type CustomerFormData = z.infer<typeof customerSchema>;

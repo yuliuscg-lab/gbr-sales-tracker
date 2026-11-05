@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { paymentApi, PaymentRecord } from '../api/payment';
 import { AddPaymentModal } from '@/components/orders/AddPaymentModal';
+import { OrderDetailModal, OrderDetailRecord } from '@/components/orders/ViewDetailsModal';
+import { orderApi } from '@/api/order';
 
 type SortOption =
     | 'PAYMENT_DATE_DESC'
@@ -44,7 +46,9 @@ export const PaymentsPage: React.FC = () => {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
     // Active Filter & Sort State
-    const [selectedMethods, setSelectedMethods] = useState<PaymentMethodType[]>([]);
+    const [selectedMethods, setSelectedMethods] = useState<PaymentMethodType[]>(
+        []
+    );
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [sortBy, setSortBy] = useState<SortOption>('PAYMENT_DATE_DESC');
@@ -53,7 +57,8 @@ export const PaymentsPage: React.FC = () => {
     const [tempMethods, setTempMethods] = useState<PaymentMethodType[]>([]);
     const [tempStartDate, setTempStartDate] = useState('');
     const [tempEndDate, setTempEndDate] = useState('');
-    const [tempSortBy, setTempSortBy] = useState<SortOption>('PAYMENT_DATE_DESC');
+    const [tempSortBy, setTempSortBy] =
+        useState<SortOption>('PAYMENT_DATE_DESC');
 
     // Add Payment Modal State
     const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
@@ -123,7 +128,8 @@ export const PaymentsPage: React.FC = () => {
             result = result.filter((item) => {
                 const receiptNo = item.receiptNo?.toLowerCase() || '';
                 const orderNo = item.order?.orderNo?.toLowerCase() || '';
-                const customerName = item.order?.customer?.name?.toLowerCase() || '';
+                const customerName =
+                    item.order?.customer?.name?.toLowerCase() || '';
                 return (
                     receiptNo.includes(q) ||
                     orderNo.includes(q) ||
@@ -135,8 +141,14 @@ export const PaymentsPage: React.FC = () => {
         // 2. Filter Multi Payment Method
         if (selectedMethods.length > 0) {
             result = result.filter((item) => {
-                const currentMethod = (item.paymentMethod || (item as any).method || '').toUpperCase();
-                return selectedMethods.includes(currentMethod as PaymentMethodType);
+                const currentMethod = (
+                    item.paymentMethod ||
+                    (item as any).method ||
+                    ''
+                ).toUpperCase();
+                return selectedMethods.includes(
+                    currentMethod as PaymentMethodType
+                );
             });
         }
 
@@ -144,14 +156,18 @@ export const PaymentsPage: React.FC = () => {
         if (startDate) {
             const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
             result = result.filter((item) => {
-                const pDate = item.paymentDate ? new Date(item.paymentDate).getTime() : 0;
+                const pDate = item.paymentDate
+                    ? new Date(item.paymentDate).getTime()
+                    : 0;
                 return pDate >= start;
             });
         }
         if (endDate) {
             const end = new Date(`${endDate}T23:59:59.999Z`).getTime();
             result = result.filter((item) => {
-                const pDate = item.paymentDate ? new Date(item.paymentDate).getTime() : 0;
+                const pDate = item.paymentDate
+                    ? new Date(item.paymentDate).getTime()
+                    : 0;
                 return pDate <= end;
             });
         }
@@ -199,6 +215,35 @@ export const PaymentsPage: React.FC = () => {
         });
     };
 
+    // State untuk Order Detail Modal
+    const [selectedOrderDetail, setSelectedOrderDetail] =
+        useState<OrderDetailRecord | null>(null);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+    const handleOpenOrderDetail = async (
+        orderId?: string,
+        fallbackOrder?: any
+    ) => {
+        if (!orderId) {
+            if (fallbackOrder) {
+                setSelectedOrderDetail(fallbackOrder as OrderDetailRecord);
+            }
+            return;
+        }
+
+        try {
+            setIsLoadingDetail(true);
+            // Mengambil data order lengkap (termasuk items dan payments)
+            const orderData = await orderApi.getById(orderId);
+            setSelectedOrderDetail(orderData as OrderDetailRecord);
+        } catch (err) {
+            // Fallback jika API getById gagal, gunakan data yang ada di item payment
+            setSelectedOrderDetail(fallbackOrder as OrderDetailRecord);
+        } finally {
+            setIsLoadingDetail(false);
+        }
+    };
+
     return (
         <div className="flex h-[calc(100vh-8.5rem)] flex-col gap-4 sm:gap-5">
             {/* 1. Header Bar */}
@@ -226,7 +271,7 @@ export const PaymentsPage: React.FC = () => {
             {/* 2. Baris Search Bar & Button Filter & Sort (Sejajar di pojok kanan) */}
             <div className="flex shrink-0 gap-3 sm:items-center sm:justify-between">
                 {/* Search Bar */}
-                <div className="relative flex-1">
+                <div className="relative flex-1  max-w-md">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                         <Search size={18} />
                     </div>
@@ -323,7 +368,8 @@ export const PaymentsPage: React.FC = () => {
                                             Payment history not found.
                                         </p>
                                         <p className="text-xs text-slate-400">
-                                            No payment transactions recorded or matching the current filter.
+                                            No payment transactions recorded or
+                                            matching the current filter.
                                         </p>
                                     </td>
                                 </tr>
@@ -363,17 +409,36 @@ export const PaymentsPage: React.FC = () => {
 
                                                 {/* 4. Order No. */}
                                                 <td className="px-5 py-3.5 whitespace-nowrap">
-                                                    <span className="font-mono font-bold text-blue-600">
-                                                        {item.order?.orderNo ||
-                                                            '-'}
-                                                    </span>
+                                                    {item.order?.orderNo ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleOpenOrderDetail(
+                                                                    item.orderId ||
+                                                                        item
+                                                                            .order
+                                                                            ?.id,
+                                                                    item.order
+                                                                )
+                                                            }
+                                                            className="cursor-pointer font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline focus:outline-none transition-colors"
+                                                            title="Lihat Detail Pesanan"
+                                                        >
+                                                            {item.order.orderNo}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="font-mono text-slate-400">
+                                                            -
+                                                        </span>
+                                                    )}
                                                 </td>
 
                                                 {/* 5. Customer Name */}
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-semibold text-slate-800">
                                                         {item.order?.customer
-                                                            ?.name || 'Pelanggan Umum'}
+                                                            ?.name ||
+                                                            'Pelanggan Umum'}
                                                     </div>
                                                     {item.order?.customer
                                                         ?.phone && (
@@ -436,7 +501,10 @@ export const PaymentsPage: React.FC = () => {
                     <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div className="flex items-center gap-2">
-                                <SlidersHorizontal size={18} className="text-blue-600" />
+                                <SlidersHorizontal
+                                    size={18}
+                                    className="text-blue-600"
+                                />
                                 <h3 className="text-base font-bold text-slate-800">
                                     Filter & Sort Payments
                                 </h3>
@@ -458,11 +526,18 @@ export const PaymentsPage: React.FC = () => {
                                 </label>
                                 <select
                                     value={tempSortBy}
-                                    onChange={(e) => setTempSortBy(e.target.value as SortOption)}
+                                    onChange={(e) =>
+                                        setTempSortBy(
+                                            e.target.value as SortOption
+                                        )
+                                    }
                                     className="cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
                                     {SORT_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
+                                        <option
+                                            key={item.value}
+                                            value={item.value}
+                                        >
                                             {item.label}
                                         </option>
                                     ))}
@@ -476,12 +551,16 @@ export const PaymentsPage: React.FC = () => {
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {METHOD_OPTIONS.map((item) => {
-                                        const isSelected = tempMethods.includes(item.value);
+                                        const isSelected = tempMethods.includes(
+                                            item.value
+                                        );
                                         return (
                                             <button
                                                 key={item.value}
                                                 type="button"
-                                                onClick={() => toggleTempMethod(item.value)}
+                                                onClick={() =>
+                                                    toggleTempMethod(item.value)
+                                                }
                                                 className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
                                                     isSelected
                                                         ? 'border-blue-600 bg-blue-50 text-blue-700'
@@ -489,7 +568,12 @@ export const PaymentsPage: React.FC = () => {
                                                 }`}
                                             >
                                                 <span>{item.label}</span>
-                                                {isSelected && <Check size={14} className="text-blue-600" />}
+                                                {isSelected && (
+                                                    <Check
+                                                        size={14}
+                                                        className="text-blue-600"
+                                                    />
+                                                )}
                                             </button>
                                         );
                                     })}
@@ -499,26 +583,37 @@ export const PaymentsPage: React.FC = () => {
                             {/* C. FILTER PAYMENT DATE */}
                             <div>
                                 <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                                    <Calendar size={13} className="text-blue-500" />
+                                    <Calendar
+                                        size={13}
+                                        className="text-blue-500"
+                                    />
                                     Payment Date Range
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <span className="text-[11px] text-slate-400">From</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            From
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempStartDate}
-                                            onChange={(e) => setTempStartDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempStartDate(e.target.value)
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-slate-400">To</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            To
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempEndDate}
                                             min={tempStartDate}
-                                            onChange={(e) => setTempEndDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempEndDate(e.target.value)
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
@@ -562,7 +657,11 @@ export const PaymentsPage: React.FC = () => {
                     </div>
                 </div>
             )}
-
+            <OrderDetailModal
+                isOpen={!!selectedOrderDetail}
+                order={selectedOrderDetail}
+                onClose={() => setSelectedOrderDetail(null)}
+            />
             {/* Modal Tambah Pembayaran */}
             <AddPaymentModal
                 isOpen={isAddPaymentModalOpen}

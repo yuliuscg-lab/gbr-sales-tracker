@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 
 
 const NAV_ITEMS = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Dashboard', path: '/dashboard/summary', icon: LayoutDashboard },
     { label: 'Orders', path: '/orders', icon: ShoppingCart },
     { label: 'Payments', path: '/payments', icon: CreditCard },
     { label: 'Customers', path: '/customers', icon: Users },
@@ -126,7 +126,7 @@ export const AppLayout: React.FC = () => {
                                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-[14                                                                                                     px] font-bold text-slate-700">
                                     {user?.name?.[0]?.toUpperCase()}
                                 </div>
-                                <div className="truncate">
+                                <div className="hidden md:flex truncate">
                                     <p className="truncate text-sm font-semibold text-slate-800">{user?.name.toUpperCase()}</p>
                                 </div>
                                 <ChevronDown size={18}/>

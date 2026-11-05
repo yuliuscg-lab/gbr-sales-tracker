@@ -55,6 +55,7 @@ export class PaymentRepository {
                 order: {
                     include: {
                         customer: true,
+                        items:true,
                     },
                 },
             },

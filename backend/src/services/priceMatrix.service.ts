@@ -19,7 +19,9 @@ export class PriceMatrixService {
 
     async updateCustomerMatrix(
         customerId:string,
-        prices: { productUnitId:string; price:number}[]
+        prices: { 
+            productUnitId:string;
+            price:number}[]
     ) {
         const customer = await customerRepository.findById(customerId);
         if(!customer) {

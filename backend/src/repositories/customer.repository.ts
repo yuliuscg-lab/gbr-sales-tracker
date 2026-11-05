@@ -1,29 +1,43 @@
-import { OrderStatus, Prisma, PrismaClient } from "@prisma/client";
-import { prisma } from "../config/prisma";
-import { CreateCustomerDTO, UpdateCustomerDTO } from "../types/customer.type";
+import { OrderStatus, Prisma, PrismaClient } from '@prisma/client';
+import { prisma } from '../config/prisma';
+import { CreateCustomerDTO, UpdateCustomerDTO } from '../types/customer.type';
 
 export class CustomerRepository {
-    async findMany(search?:string) {
+    async findMany(search?: string) {
         return prisma.customer.findMany({
-            where:search ? {
-                OR:[
-                    {name:{contains:search, mode:"insensitive"}},
-                    {phone:{contains:search, mode:"insensitive"}},
-                ],
-            } : undefined,
-            orderBy: { createdAt:"desc"}
+            where: search
+                ? {
+                    OR: [
+                        { name: { contains: search, mode: 'insensitive' } },
+                        { phone: { contains: search, mode: 'insensitive' } },
+                    ],
+                }
+                : undefined,
+            orderBy: { createdAt: 'desc' },
         });
     }
 
-    async findById(id:string) {
+    async findById(id: string) {
         return prisma.customer.findUnique({
             where: { id },
+            include: {
+                orders: {
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        items:true,
+                        payments: {
+                            where: { deletedAt: null },
+                            orderBy: { paymentDate: 'desc' },
+                        },
+                    },
+                },
+            },
         });
     }
 
-    findByName(name:string) {
+    findByName(name: string) {
         return prisma.customer.findFirst({
-            where: { name:{equals: name, mode: "insensitive"}},
+            where: { name: { equals: name, mode: 'insensitive' } },
         });
     }
 
@@ -33,14 +47,17 @@ export class CustomerRepository {
         });
     }
 
-    async update (id:string, data:UpdateCustomerDTO) {
+    async update(id: string, data: UpdateCustomerDTO) {
         return prisma.customer.update({
-            where: {id},
+            where: { id },
             data,
         });
     }
 
-    async syncOrderMetrics(customerId:string, tx?: Prisma.TransactionClient):Promise<{totalOrders:number; unpaidOrdersCount:number}> {
+    async syncOrderMetrics(
+        customerId: string,
+        tx?: Prisma.TransactionClient
+    ): Promise<{ totalOrders: number; unpaidOrdersCount: number }> {
         const client = tx || prisma;
 
         const [totalOrders, unpaidOrdersCount] = await Promise.all([
@@ -48,7 +65,7 @@ export class CustomerRepository {
                 where: {
                     customerId,
                     status: {
-                        not: OrderStatus.CANCELLED
+                        not: OrderStatus.CANCELLED,
                     },
                 },
             }),
@@ -63,20 +80,20 @@ export class CustomerRepository {
         ]);
 
         await client.customer.update({
-            where: { id : customerId },
-            data: { 
+            where: { id: customerId },
+            data: {
                 totalOrders,
                 unpaidOrdersCount,
             },
         });
-        return {totalOrders, unpaidOrdersCount};
+        return { totalOrders, unpaidOrdersCount };
     }
-    
-    async delete(id:string) {
+
+    async delete(id: string) {
         return prisma.customer.update({
-            where: {id},
-            data: { deletedAt: new Date()}
-        })
+            where: { id },
+            data: { deletedAt: new Date() },
+        });
     }
 }
 

@@ -105,6 +105,50 @@ export class ProductRepository {
         });
     }
 
+    async createManyWithUnits(
+        items: {
+            code: string;
+            name: string;
+            baseUnit: string;
+            costPrice: number;
+            additionalUnits?: { unitName: string; conversionQty: number }[];
+        }[]
+    ) {
+        return prisma.$transaction(async (tx) => {
+            const createdProducts = [];
+
+            for (const item of items) {
+                // Susun unit bawaan (factor = 1) dan unit tambahan
+                const unitsData = [
+                    {
+                        unitName: item.baseUnit,
+                        conversionQty: 1,
+                    },
+                    ...(item.additionalUnits || []),
+                ];
+
+                const product = await tx.product.create({
+                    data: {
+                        code: item.code,
+                        name: item.name,
+                        baseUnit: item.baseUnit,
+                        costPrice: item.costPrice,
+                        units: {
+                            create: unitsData,
+                        },
+                    },
+                    include: {
+                        units: true,
+                    },
+                });
+
+                createdProducts.push(product);
+            }
+
+            return createdProducts;
+        });
+    }
+
     async update(id: string, data: UpdateProductDTO) {
         return prisma.$transaction(async (tx) => {
             const current = await tx.product.findUniqueOrThrow({

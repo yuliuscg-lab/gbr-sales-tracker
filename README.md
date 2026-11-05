@@ -1,207 +1,198 @@
-# EventPulse — Event Management App
+# 🎣 GBR Sales Tracker (Bait & Tackle Tracker)
 
-A full-stack **Event Management** platform built as a monorepo. Supports three user roles: **Customer**, **Organizer**, and **Admin** — each with their own dashboard and feature set.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Language** | TypeScript 7.0.2 (Strict Mode) |
-| **Frontend** | Vite 8.1.4, React 19, React Router 8, Tailwind CSS 4, Shadcn/UI |
-| **State & Data** | Zustand, TanStack Query v5, React Hook Form + Zod |
-| **Backend** | Express.js 5 (Route → Controller → Service → Repository) |
-| **Validation** | Zod |
-| **ORM & DB** | Prisma 7.8, PostgreSQL (Neon.com) |
-| **Auth** | JWT (Access + Refresh Token, HttpOnly Cookie) |
-| **Image Upload** | Cloudinary (via Multer) |
-| **Charts** | Recharts |
+Aplikasi manajemen operasional penjualan, pencatatan piutang (bon tempo), pelacakan pengiriman, dan pemantauan laba rugi (*Profit & Loss*) yang dirancang khusus untuk UMKM toko & distributor umpan pancing.
 
 ---
 
-## Features
+## 📌 Ringkasan Proyek
 
-### Customer
-- Browse & search events by category, city, and date
-- View event details, ticket types, and venue info
-- Purchase tickets with points redemption and coupon discounts
-- Upload payment proof
-- View order history and issued tickets
+**GBR Sales Tracker** dibangun dengan pendekatan arsitektur modular berlapis (*Route → Controller → Service → Repository*) untuk memastikan keandalan data transaksi, pemisahan tanggung jawab kode yang bersih, serta kecepatan respon antarmuka kasir dan pemilik toko.
 
-### Organizer
-- Create, edit, and manage events with image upload
-- Define ticket types and quotas
-- View sales orders and verify payments
-- Track revenue and sales statistics
-
-### Admin
-- Manage users, venues, and categories
-- Monitor platform-wide orders and payments
+### Fitur Utama:
+1. **Dashboard Eksekutif & Finansial:**
+   * Ringkasan KPI: Omzet kotor (*Gross Revenue*), realisasi kas tertagih (*Realized Revenue*), estimasi Laba Bersih (*Net Profit*), arus kas keluar (*Cash Out*), dan saldo total piutang beredar.
+   * Grafik tren bulanan 12 bulan (Omzet vs Laba Bersih) tanpa dependensi chart berat.
+   * Top 15 produk terlaris berdasarkan kuantitas & kontribusi omzet.
+   * Indikator tindakan cepat: Pesanan perlu dikirim (*Pending Delivery*) & Top 5 pelanggan dengan piutang terbesar.
+2. **Katalog Produk & Konversi Multi-Satuan (UOM):**
+   * Dukungan satuan dasar (*Base UOM*, misal: Pcs) dan satuan grosir/kemasan bertingkat (*Secondary UOM*, misal: Pack, Dus) lengkap dengan rasio konversi otomatis.
+   * Penetapan harga jual grosir yang fleksibel per satuan kemasan.
+   * Tooltip kalkulasi HPP otomatis saat input transaksi.
+3. **Manajemen Order & Penjualan (Invoicing):**
+   * Pembuatan nota penjualan dinamis dengan validasi skema Zod.
+   * Penanganan status pembayaran: `PAID`, `PARTIALLY_PAID`, `UNPAID`, dan `CANCELLED`.
+   * Penanganan status logistik pengiriman: `NOT_SHIPPED` dan `SHIPPED`.
+4. **Pelacakan Piutang & Pembayaran (Bon Tracker):**
+   * Pencatatan cicilan/pelunasan bon pelanggan via Tunai maupun Transfer.
+   * Pelacakan jatuh tempo (*Due Date*) dan batas bon pelanggan.
+5. **Pencatatan Pengeluaran & Arus Kas (Expenses):**
+   * Pemisahan biaya operasional toko (*Operational Expense*) dan belanja modal persediaan/kulakan (*Material Purchase*).
+   * Sinkronisasi langsung ke perhitungan Laba Bersih periode berjalan.
+6. **Autentikasi & Keamanan:**
+   * Akses berbasis JWT dengan mekanisme token rotasi: *in-memory* Access Token (Zustand) dan *HttpOnly secure cookie* Refresh Token.
 
 ---
 
-## Project Structure
+## 🛠️ Tech Stack
 
+### Frontend
+* **Framework / Bundler:** [React](https://react.dev/) + [Vite](https://vitejs.dev/) (TypeScript)
+* **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
+* **State & Data Fetching:** [Zustand](https://zustand-demo.pmnd.rs/) (Auth State) & [@tanstack/react-query](https://tanstack.com/query/latest) (Server State)
+* **Form & Validasi:** [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
+* **HTTP Client:** [Axios](https://axios-http.com/) (Interceptors untuk silent token refresh)
+* **Icons:** [Lucide React](https://lucide.dev/)
+
+### Backend
+* **Runtime:** [Node.js](https://nodejs.org/) (Express.js v5)
+* **Bahasa:** TypeScript
+* **ORM:** [Prisma ORM v5](https://www.prisma.io/)
+* **Database:** [Neon PostgreSQL](https://neon.tech/) (Serverless Postgres with Connection Pooling)
+* **Keamanan & Utilitas:** `bcrypt`, `jsonwebtoken`, `cookie-parser`, `cors`
+
+---
+
+## 📁 Struktur Direktori
+
+```text
+gbr-sales-tracker/
+├── package.json                 # Skrip concurrently untuk root runner
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma        # Definisi data model (User, Customer, Product, Order, Expense, dll.)
+│   │   └── migrations/
+│   ├── src/
+│   │   ├── config/              # Inisialisasi Prisma Client & environment
+│   │   ├── controllers/         # Handler HTTP request & response
+│   │   ├── errors/              # Custom AppError & handler
+│   │   ├── middlewares/         # JWT Auth, error middleware
+│   │   ├── repositories/        # Query database murni via Prisma
+│   │   ├── routes/              # Deklarasi router endpoint API
+│   │   ├── services/            # Business logic, validasi aturan bisnis, kalkulasi finansial
+│   │   ├── types/               # TypeScript interfaces & DTO
+│   │   ├── utils/               # Format response standar, password hash
+│   │   └── server.ts            # Entrypoint Express app
+│   ├── .env
+│   ├── package.json
+│   └── tsconfig.json
+└── frontend/
+    ├── src/
+    │   ├── api/                 # Axios client, auth service, & endpoint helpers
+    │   ├── components/          # Reusable UI primitives, modal, layout shell
+    │   ├── hooks/               # Custom React hooks
+    │   ├── pages/               # Tampilan halaman utama (Dashboard, Orders, Products, Customers, Expenses)
+    │   ├── routes/              # ProtectedRoute guard & React Router mapping
+    │   ├── store/               # Zustand store (authStore)
+    │   ├── types/               # Type definitions frontend
+    │   ├── validation/          # Zod schemas untuk form input
+    │   ├── App.tsx              # Session bootstrap check & root layout
+    │   └── main.tsx
+    ├── .env
+    ├── package.json
+    ├── tailwind.config.js / vite.config.ts
+    └── tsconfig.json
 ```
-event-management/
-├── backend/          # Express.js API server
-│   ├── prisma/       # Prisma schema & migrations
-│   └── src/
-│       ├── config/
-│       ├── controllers/
-│       ├── middlewares/
-│       ├── repositories/
-│       ├── routes/
-│       ├── schedulers/
-│       ├── services/
-│       ├── types/
-│       ├── utils/
-│       └── validation/
-└── frontend/         # Vite + React SPA
-    └── src/
-        ├── api/
-        ├── components/
-        ├── hooks/
-        ├── pages/
-        │   ├── admin/
-        │   ├── customer/
-        │   └── organizer/
-        ├── routes/
-        ├── store/
-        ├── types/
-        └── validation/
-```
 
 ---
 
-## Getting Started
+## 🚀 Panduan Memulai (Local Development)
 
-### Prerequisites
+### 1. Prasyarat
+* Node.js v18+ atau v20+
+* Akun database PostgreSQL di [Neon](https://neon.tech/)
 
-- Node.js >= 18
-- PostgreSQL database (recommended: [Neon.com](https://neon.com) — free tier available)
-- Cloudinary account (free tier) for image uploads
-
----
-
-## Environment Variables
-
-### 1. Backend — `backend/.env`
-
-Copy `backend/.env.example` to `backend/.env` and fill in your values:
-
+### 2. Kloning Repositori
 ```bash
-cp backend/.env.example backend/.env
+git clone https://github.com/username/gbr-sales-tracker.git
+cd gbr-sales-tracker
 ```
 
-| Variable | Description |
-|---|---|
-| `PORT` | Port the API server listens on (default: `5000`) |
-| `NODE_ENV` | `development` or `production` |
-| `DATABASE_URL` | Direct PostgreSQL URL — used for `prisma db push` |
-| `APP_DATABASE_URL` | Pooler PostgreSQL URL — used for runtime queries |
-| `JWT_ACCESS_SECRET` | Random secret for signing access tokens |
-| `JWT_REFRESH_SECRET` | Random secret for signing refresh tokens |
-| `JWT_ACCESS_EXPIRES_IN` | Access token TTL (e.g. `15m`) |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL (e.g. `7d`) |
-| `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Your Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
+### 3. Konfigurasi Environment Variables
 
-> **Tip:** Generate strong JWT secrets with:
-> ```bash
-> node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-> ```
+#### Backend (`backend/.env`):
+```env
+PORT=5000
+NODE_ENV=development
 
-### 2. Frontend — `frontend/.env`
+# Neon Connection Strings
+DATABASE_URL="postgresql://user:password@ep-xyz-pooler.region.aws.neon.tech/neondb?sslmode=require"
+DIRECT_URL="postgresql://user:password@ep-xyz.region.aws.neon.tech/neondb?sslmode=require"
 
-Copy `frontend/.env.example` to `frontend/.env`:
-
-```bash
-cp frontend/.env.example frontend/.env
+# JWT Config
+JWT_ACCESS_SECRET="ganti_dengan_access_secret_acak"
+JWT_REFRESH_SECRET="ganti_dengan_refresh_secret_acak"
 ```
 
-| Variable | Description |
-|---|---|
-| `VITE_API_URL` | Base URL of the backend API (default: `http://localhost:5000/api`) |
+#### Frontend (`frontend/.env`):
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
 
----
+### 4. Instalasi Dependensi
 
-## Installation & Running
-
-### Option A: Run Both from Root (Recommended)
-
+Jalankan instalasi di root folder dan masing-masing sub-folder:
 ```bash
-# Install root dependencies
+# Root dependencies (concurrently)
 npm install
 
-# Install sub-project dependencies
-cd backend && npm install && cd ..
-cd frontend && npm install && cd ..
+# Backend dependencies & Prisma setup
+cd backend
+npm install
+npx prisma generate
+npx prisma migrate dev --name init_schema
+cd ..
 
-# Run both concurrently from root
+# Frontend dependencies
+cd frontend
+npm install
+cd ..
+```
+
+### 5. Menjalankan Aplikasi Secara Bersamaan
+
+Dari direktori root proyek, jalankan:
+```bash
 npm run dev
 ```
 
-### Option B: Run Separately
-
-**Backend:**
-```bash
-cd backend
-npm install
-npx prisma db push      # sync DB schema (first time only)
-npm run dev             # starts on http://localhost:5000
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev             # starts on http://localhost:5173
-```
+* Backend API: `http://localhost:5000`
+* Frontend App: `http://localhost:5173`
 
 ---
 
-## Database Setup
+## 📦 Panduan Skrip NPM
 
-This project uses **Prisma** with **PostgreSQL** (Neon.com recommended):
-
-1. Create a free database at [neon.com](https://neon.com)
-2. Copy both the **direct** and **pooler** connection strings into `backend/.env`
-3. Push the schema:
-   ```bash
-   cd backend
-   npx prisma db push
-   ```
-4. (Optional) Seed the database:
-   ```bash
-   npx prisma db seed
-   ```
+| Lokasi | Perintah | Deskripsi |
+| :--- | :--- | :--- |
+| **Root** | `npm run dev` | Menjalankan backend dan frontend secara paralel menggunakan `concurrently` |
+| **Backend** | `npm run dev` | Menjalankan Express backend dalam mode watch (`tsx`) |
+| **Backend** | `npm run build` | Melakukan kompilasi TypeScript ke JavaScript (`dist/`) |
+| **Backend** | `npx prisma studio` | Membuka antarmuka tabel database Prisma di browser |
+| **Frontend** | `npm run dev` | Menjalankan server dev Vite SPA |
+| **Frontend** | `npm run build` | Mengompilasi berkas statis frontend siap produksi (`dist/`) |
 
 ---
 
-## Available Scripts
+## 🌐 Arsitektur Deployment Rekomendasi
 
-### Root
-| Script | Description |
-|---|---|
-| `npm run dev` | Run frontend + backend concurrently |
-| `npm run backend` | Run backend only |
-| `npm run frontend` | Run frontend only |
+Aplikasi ini dirancang untuk biaya efisien, performa tinggi, dan stabilitas operasional UMKM:
 
-### Backend (`backend/`)
-| Script | Description |
-|---|---|
-| `npm run dev` | Development mode with auto-reload (tsx watch) |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm run start` | Run compiled production build |
-| `npm run prisma:push` | Sync Prisma schema to DB |
-| `npm run prisma:generate` | Regenerate Prisma client |
+1. **Frontend (Vite + React):**
+   * Dihosting di **Vercel** / **Cloudflare Pages** (Gratis).
+   * Konfigurasi rewrites client-side routing pada `vercel.json`:
+     ```json
+     {
+       "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+     }
+     ```
+2. **Backend (Express.js 5 + Prisma):**
+   * Dihosting di **Cloud VPS Linux (Ubuntu)** menggunakan **PM2** sebagai process supervisor dan **Nginx** sebagai reverse proxy + SSL Let's Encrypt.
+   * Ringan dan tanpa jeda *cold start*.
+3. **Database:**
+   * **Neon PostgreSQL** serverless instance dengan *connection pooling*.
 
-### Frontend (`frontend/`)
-| Script | Description |
-|---|---|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Build for production |
-| `npm run preview` | Preview production build locally |
+---
+
+## 📄 Lisensi
+
+Hak Cipta © 2026 GBR Sales Tracker. Didistribusikan di bawah lisensi internal / kepemilikan pribadi untuk operasional toko.

@@ -1,12 +1,17 @@
 import { api } from './client';
 import { CustomerFormData } from '../validation/customer.validation';
-import type { Customer } from '@/types/customer.type';
+import type { Customer, CustomerDetail } from '@/types/customer.type';
 
 export const customerApi = {
     async getAll(search?: string) {
         const res = await api.get<{ success: boolean; data: Customer[] }>('/customers', {
-        params: search ? { search } : undefined,
+            params: search ? { search } : undefined,
         });
+        return res.data.data;
+    },
+
+    async getById(id: string): Promise<CustomerDetail> {
+        const res = await api.get<{ success: boolean; data: CustomerDetail }>(`/customers/${id}`);
         return res.data.data;
     },
 

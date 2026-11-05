@@ -21,13 +21,28 @@ import {
     SlidersHorizontal,
     X,
     Check,
+    Truck,
+    ClipboardList,
+    ChevronDown,
+    Image
 } from 'lucide-react';
-import { orderApi, OrderStatus, OrderRecord } from '../api/order';
+import {
+    orderApi,
+    OrderStatus,
+    OrderRecord,
+    DeliveryStatus,
+} from '../api/order';
 import { ConfirmCancelOrderModal } from '../components/orders/ConfirmCancelOrderModal';
 import { SearchBar } from '@/components/common/SearchBar';
 import { AddPaymentModal } from '@/components/orders/AddPaymentModal';
-import { OrderDetailModal, OrderDetailRecord } from '@/components/orders/ViewDetailsModal';
-import { downloadInvoicePdf } from '@/utils/generateInvoicePdf';
+import {
+    OrderDetailModal,
+    OrderDetailRecord,
+} from '@/components/orders/ViewDetailsModal';
+import { downloadInvoiceJpg, downloadInvoicePdf } from '@/utils/generateInvoicePdf';
+import { UpdateDeliveryModal } from '@/components/orders/UpdateDeliveryModal';
+import { downloadProductionCardPdf } from '@/utils/generateProductionCardPdf';
+import { downloadDeliveryOrderPdf } from '@/utils/generateDeliveryOrderPdf';
 
 type SortOption =
     | 'REMAINING_DESC'
@@ -42,6 +57,11 @@ const STATUS_OPTIONS: { label: string; value: OrderStatus }[] = [
     { label: 'Partially Paid', value: 'PARTIALLY_PAID' },
     { label: 'Paid', value: 'PAID' },
     { label: 'Cancelled', value: 'CANCELLED' },
+];
+
+const DELIVERY_STATUS_OPTIONS: { label: string; value: DeliveryStatus }[] = [
+    { label: 'Not Shipped', value: 'NOT_SHIPPED' },
+    { label: 'Shipped', value: 'SHIPPED' },
 ];
 
 const SORT_OPTIONS: { label: string; value: SortOption }[] = [
@@ -66,6 +86,9 @@ export const OrdersPage: React.FC = () => {
 
     // Active Filters & Sort State
     const [selectedStatuses, setSelectedStatuses] = useState<OrderStatus[]>([]);
+    const [selectedDeliveryStatuses, setSelectedDeliveryStatuses] = useState<
+        DeliveryStatus[]
+    >([]);
     const [orderStartDate, setOrderStartDate] = useState('');
     const [orderEndDate, setOrderEndDate] = useState('');
     const [dueStartDate, setDueStartDate] = useState('');
@@ -74,6 +97,9 @@ export const OrdersPage: React.FC = () => {
 
     // Temporary modal state (Draft sebelum apply)
     const [tempStatuses, setSelectedTempStatuses] = useState<OrderStatus[]>([]);
+    const [tempDeliveryStatuses, setSelectedTempDeliveryStatuses] = useState<
+        DeliveryStatus[]
+    >([]);
     const [tempOrderStartDate, setTempOrderStartDate] = useState('');
     const [tempOrderEndDate, setTempOrderEndDate] = useState('');
     const [tempDueStartDate, setTempDueStartDate] = useState('');
@@ -86,7 +112,8 @@ export const OrdersPage: React.FC = () => {
         orderNo: string;
     } | null>(null);
     const [orderToPay, setOrderToPay] = useState<OrderRecord | null>(null);
-    const [orderForDetail, setOrderForDetail] = useState<OrderDetailRecord | null>(null);
+    const [orderForDetail, setOrderForDetail] =
+        useState<OrderDetailRecord | null>(null);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -115,8 +142,19 @@ export const OrdersPage: React.FC = () => {
         }
     };
 
+    const toggleTempDeliveryStatus = (status: DeliveryStatus) => {
+        if (tempDeliveryStatuses.includes(status)) {
+            setSelectedTempDeliveryStatuses(
+                tempDeliveryStatuses.filter((s) => s !== status)
+            );
+        } else {
+            setSelectedTempDeliveryStatuses([...tempDeliveryStatuses, status]);
+        }
+    };
+
     const handleApplyFilterSort = () => {
         setSelectedStatuses(tempStatuses);
+        setSelectedDeliveryStatuses(tempDeliveryStatuses);
         setOrderStartDate(tempOrderStartDate);
         setOrderEndDate(tempOrderEndDate);
         setDueStartDate(tempDueStartDate);
@@ -127,6 +165,7 @@ export const OrdersPage: React.FC = () => {
 
     const handleResetAll = () => {
         setSelectedStatuses([]);
+        setSelectedDeliveryStatuses([]);
         setOrderStartDate('');
         setOrderEndDate('');
         setDueStartDate('');
@@ -134,6 +173,7 @@ export const OrdersPage: React.FC = () => {
         setSortBy('ORDER_DATE_DESC');
 
         setSelectedTempStatuses([]);
+        setSelectedDeliveryStatuses([]);
         setTempOrderStartDate('');
         setTempOrderEndDate('');
         setTempDueStartDate('');
@@ -145,11 +185,21 @@ export const OrdersPage: React.FC = () => {
     const activeFilterCount = useMemo(() => {
         let count = 0;
         if (selectedStatuses.length > 0) count += selectedStatuses.length;
+        if (selectedDeliveryStatuses.length > 0)
+            count += selectedDeliveryStatuses.length;
         if (orderStartDate || orderEndDate) count += 1;
         if (dueStartDate || dueEndDate) count += 1;
         if (sortBy !== 'ORDER_DATE_DESC') count += 1;
         return count;
-    }, [selectedStatuses, orderStartDate, orderEndDate, dueStartDate, dueEndDate, sortBy]);
+    }, [
+        selectedStatuses,
+        selectedDeliveryStatuses,
+        orderStartDate,
+        orderEndDate,
+        dueStartDate,
+        dueEndDate,
+        sortBy,
+    ]);
 
     // Fetch data orders (Fetch semua / berdasarkan search text)
     const { data: rawOrders = [], isLoading } = useQuery({
@@ -180,21 +230,33 @@ export const OrdersPage: React.FC = () => {
 
         // 1. Filter Multi-Status
         if (selectedStatuses.length > 0) {
-            result = result.filter((item) => selectedStatuses.includes(item.status));
+            result = result.filter((item) =>
+                selectedStatuses.includes(item.status)
+            );
+        }
+
+        if (selectedDeliveryStatuses.length > 0) {
+            result = result.filter((item) =>
+                selectedDeliveryStatuses.includes(item.deliveryStatus)
+            );
         }
 
         // 2. Filter Order Date
         if (orderStartDate) {
             const start = new Date(`${orderStartDate}T00:00:00.000Z`).getTime();
             result = result.filter((item) => {
-                const dateVal = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+                const dateVal = item.createdAt
+                    ? new Date(item.createdAt).getTime()
+                    : 0;
                 return dateVal >= start;
             });
         }
         if (orderEndDate) {
             const end = new Date(`${orderEndDate}T23:59:59.999Z`).getTime();
             result = result.filter((item) => {
-                const dateVal = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+                const dateVal = item.createdAt
+                    ? new Date(item.createdAt).getTime()
+                    : 0;
                 return dateVal <= end;
             });
         }
@@ -220,8 +282,12 @@ export const OrdersPage: React.FC = () => {
             const remA = Math.max(0, a.totalAmount - (a.paidAmount || 0));
             const remB = Math.max(0, b.totalAmount - (b.paidAmount || 0));
 
-            const orderDateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const orderDateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            const orderDateA = a.createdAt
+                ? new Date(a.createdAt).getTime()
+                : 0;
+            const orderDateB = b.createdAt
+                ? new Date(b.createdAt).getTime()
+                : 0;
 
             const dueDateA = a.dueDate ? new Date(a.dueDate).getTime() : null;
             const dueDateB = b.dueDate ? new Date(b.dueDate).getTime() : null;
@@ -254,6 +320,7 @@ export const OrdersPage: React.FC = () => {
     }, [
         rawOrders,
         selectedStatuses,
+        selectedDeliveryStatuses,
         orderStartDate,
         orderEndDate,
         dueStartDate,
@@ -315,6 +382,65 @@ export const OrdersPage: React.FC = () => {
                 );
         }
     };
+
+    // State untuk modal delivery status
+    const [orderToUpdateDelivery, setOrderToUpdateDelivery] =
+        useState<OrderRecord | null>(null);
+
+    // Mutasi Update Status Pengiriman
+    const deliveryMutation = useMutation({
+        mutationFn: ({
+            id,
+            deliveryStatus,
+            shippedAt,
+        }: {
+            id: string;
+            deliveryStatus: DeliveryStatus;
+            shippedAt: string | null;
+        }) => orderApi.updateDeliveryStatus(id, { deliveryStatus, shippedAt }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            setOrderToUpdateDelivery(null);
+        },
+        onError: (err: any) => {
+            alert(
+                err.response?.data?.message ||
+                    'Gagal mengubah status pengiriman'
+            );
+        },
+    });
+
+    // Render Badge Status Pengiriman (Shipped vs Not Shipped)
+    const renderDeliveryBadge = (deliveryStatus?: DeliveryStatus) => {
+        if (deliveryStatus === 'SHIPPED') {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[12px] font-semibold text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 size={11} className="text-emerald-600" />
+                    <span>Shipped</span>
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[12px] font-semibold text-amber-700 border border-amber-200">
+                <Truck size={11} className="text-amber-600" />
+                <span>Not Shipped</span>
+            </span>
+        );
+    };
+
+    // Di dalam komponen OrdersPage:
+    const [openDownloadMenuId, setOpenDownloadMenuId] = useState<string | null>(
+        null
+    );
+
+    // Tutup menu jika klik di luar
+    useEffect(() => {
+        const handleOutsideClick = () => setOpenDownloadMenuId(null);
+        window.addEventListener('click', handleOutsideClick);
+        return () => window.removeEventListener('click', handleOutsideClick);
+    }, []);
+
+    const [isProcessingImg, setIsProcessingImg] = useState<string | null>(null);
 
     return (
         <div className="flex flex-col h-[calc(100vh-8.5rem)] gap-4 sm:gap-6">
@@ -405,7 +531,8 @@ export const OrdersPage: React.FC = () => {
                             No orders found
                         </p>
                         <p className="text-xs text-slate-400">
-                            Please adjust your search, filter, or sorting criteria.
+                            Please adjust your search, filter, or sorting
+                            criteria.
                         </p>
                     </div>
                 ) : (
@@ -440,8 +567,11 @@ export const OrdersPage: React.FC = () => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div>
+                                            <div className="flex gap-2">
                                                 {renderStatusBadge(ord.status)}
+                                                {renderDeliveryBadge(
+                                                    ord.deliveryStatus
+                                                )}
                                             </div>
                                         </div>
 
@@ -548,8 +678,8 @@ export const OrdersPage: React.FC = () => {
                                                 ord.status === 'PAID'
                                                     ? 'Order already paid'
                                                     : ord.status === 'CANCELLED'
-                                                        ? 'Order already cancelled'
-                                                        : 'Add Payment'
+                                                      ? 'Order already cancelled'
+                                                      : 'Add Payment'
                                             }
                                         >
                                             <CreditCard size={18} />
@@ -559,19 +689,177 @@ export const OrdersPage: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    downloadInvoicePdf(ord)
+                                                    setOrderToUpdateDelivery(
+                                                        ord
+                                                    )
                                                 }
                                                 disabled={
+                                                    ord.deliveryStatus ===
+                                                        'SHIPPED' ||
                                                     ord.status === 'CANCELLED'
                                                 }
-                                                className="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                                                title="Download Invoice"
+                                                className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                                    ord.deliveryStatus ===
+                                                    'SHIPPED'
+                                                        ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                        : ord.status !==
+                                                            'CANCELLED'
+                                                          ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                                title="Update Delivery Status"
                                             >
-                                                <FileText
-                                                    size={18}
-                                                    className="text-slate-500"
-                                                />
+                                                <Truck size={18} />
                                             </button>
+                                            {/* Dropdown Menu Download Berkas */}
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOpenDownloadMenuId(
+                                                            openDownloadMenuId ===
+                                                                ord.id
+                                                                ? null
+                                                                : ord.id
+                                                        );
+                                                    }}
+                                                    disabled={
+                                                        ord.status ===
+                                                        'CANCELLED'
+                                                    }
+                                                    className="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title="Opsi Unduh Berkas"
+                                                >
+                                                    <FileText
+                                                        size={16}
+                                                        className="text-slate-500"
+                                                    />
+                                                    <ChevronDown
+                                                        size={13}
+                                                        className="text-slate-400"
+                                                    />
+                                                </button>
+
+                                                {/* Menu Dropdown Opsi File */}
+                                                {openDownloadMenuId ===
+                                                    ord.id && (
+                                                    <div
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                        className="absolute right-0 bottom-full mb-2 z-30 w-48 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg animate-in fade-in zoom-in-95"
+                                                    >
+                                                        <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                                                            Pilih Berkas PDF
+                                                        </div>
+
+                                                        {/* Opsi 1: Invoice PDF */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                downloadInvoicePdf(
+                                                                    ord
+                                                                );
+                                                                setOpenDownloadMenuId(
+                                                                    null
+                                                                );
+                                                            }}
+                                                            className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                                                        >
+                                                            <FileText
+                                                                size={15}
+                                                                className="text-blue-600 shrink-0"
+                                                            />
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-800">
+                                                                    Invoice
+                                                                    (PDF)
+                                                                </p>
+                                                            </div>
+                                                        </button>
+
+                                                        {/* Opsi 2: Invoice JPG (Khusus WA) */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                setOpenDownloadMenuId(
+                                                                    null
+                                                                );
+                                                                setIsProcessingImg(
+                                                                    ord.id
+                                                                );
+                                                                await downloadInvoiceJpg(
+                                                                    ord
+                                                                );
+                                                                setIsProcessingImg(
+                                                                    null
+                                                                );
+                                                            }}
+                                                            className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left hover:bg-emerald-50 transition-colors"
+                                                        >
+                                                            <Image
+                                                                size={15}
+                                                                className="text-emerald-600 shrink-0"
+                                                            />
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-800">
+                                                                    Invoice
+                                                                    Gambar (JPG)
+                                                                </p>
+                                                            </div>
+                                                        </button>
+
+                                                        {/* Opsi 2: Kartu Produksi */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                downloadProductionCardPdf(
+                                                                    ord
+                                                                );
+                                                                setOpenDownloadMenuId(
+                                                                    null
+                                                                );
+                                                            }}
+                                                            className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                                                        >
+                                                            <ClipboardList
+                                                                size={14}
+                                                                className="text-amber-600"
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold">
+                                                                    Kartu
+                                                                    Produksi
+                                                                </span>
+                                                            </div>
+                                                        </button>
+                                                        {/* Opsi 3: Surat Jalan */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                downloadDeliveryOrderPdf(
+                                                                    ord
+                                                                );
+                                                                setOpenDownloadMenuId(
+                                                                    null
+                                                                );
+                                                            }}
+                                                            className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                                                        >
+                                                            <Truck
+                                                                size={14}
+                                                                className="text-emerald-600"
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold">
+                                                                    Surat Jalan
+                                                                </span>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
 
                                             <button
                                                 type="button"
@@ -595,7 +883,9 @@ export const OrdersPage: React.FC = () => {
                                                     )
                                                 }
                                                 disabled={
-                                                    ord.status === 'CANCELLED' || ord.status === 'PAID'
+                                                    ord.status ===
+                                                        'CANCELLED' ||
+                                                    ord.status === 'PAID'
                                                 }
                                                 className="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title="Edit Order"
@@ -647,7 +937,10 @@ export const OrdersPage: React.FC = () => {
                     <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div className="flex items-center gap-2">
-                                <SlidersHorizontal size={18} className="text-blue-600" />
+                                <SlidersHorizontal
+                                    size={18}
+                                    className="text-blue-600"
+                                />
                                 <h3 className="text-base font-bold text-slate-800">
                                     Filter & Sort Orders
                                 </h3>
@@ -669,11 +962,18 @@ export const OrdersPage: React.FC = () => {
                                 </label>
                                 <select
                                     value={tempSortBy}
-                                    onChange={(e) => setTempSortBy(e.target.value as SortOption)}
+                                    onChange={(e) =>
+                                        setTempSortBy(
+                                            e.target.value as SortOption
+                                        )
+                                    }
                                     className="cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
                                     {SORT_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
+                                        <option
+                                            key={item.value}
+                                            value={item.value}
+                                        >
                                             {item.label}
                                         </option>
                                     ))}
@@ -687,12 +987,15 @@ export const OrdersPage: React.FC = () => {
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {STATUS_OPTIONS.map((item) => {
-                                        const isSelected = tempStatuses.includes(item.value);
+                                        const isSelected =
+                                            tempStatuses.includes(item.value);
                                         return (
                                             <button
                                                 key={item.value}
                                                 type="button"
-                                                onClick={() => toggleTempStatus(item.value)}
+                                                onClick={() =>
+                                                    toggleTempStatus(item.value)
+                                                }
                                                 className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
                                                     isSelected
                                                         ? 'border-blue-600 bg-blue-50 text-blue-700'
@@ -700,7 +1003,51 @@ export const OrdersPage: React.FC = () => {
                                                 }`}
                                             >
                                                 <span>{item.label}</span>
-                                                {isSelected && <Check size={14} className="text-blue-600" />}
+                                                {isSelected && (
+                                                    <Check
+                                                        size={14}
+                                                        className="text-blue-600"
+                                                    />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* D. MULTI-SELECT DELIVERY STATUS */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                    Delivery Status
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {DELIVERY_STATUS_OPTIONS.map((item) => {
+                                        const isSelected =
+                                            tempDeliveryStatuses.includes(
+                                                item.value
+                                            );
+                                        return (
+                                            <button
+                                                key={item.value}
+                                                type="button"
+                                                onClick={() =>
+                                                    toggleTempDeliveryStatus(
+                                                        item.value
+                                                    )
+                                                }
+                                                className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                                                    isSelected
+                                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                                        : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span>{item.label}</span>
+                                                {isSelected && (
+                                                    <Check
+                                                        size={14}
+                                                        className="text-blue-600"
+                                                    />
+                                                )}
                                             </button>
                                         );
                                     })}
@@ -710,26 +1057,41 @@ export const OrdersPage: React.FC = () => {
                             {/* C. FILTER ORDER DATE */}
                             <div>
                                 <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                                    <Calendar size={13} className="text-blue-500" />
+                                    <Calendar
+                                        size={13}
+                                        className="text-blue-500"
+                                    />
                                     Order Date Range
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <span className="text-[11px] text-slate-400">From</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            From
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempOrderStartDate}
-                                            onChange={(e) => setTempOrderStartDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempOrderStartDate(
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-slate-400">To</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            To
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempOrderEndDate}
                                             min={tempOrderStartDate}
-                                            onChange={(e) => setTempOrderEndDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempOrderEndDate(
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
@@ -739,26 +1101,41 @@ export const OrdersPage: React.FC = () => {
                             {/* D. FILTER DUE DATE */}
                             <div>
                                 <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                                    <Calendar size={13} className="text-amber-500" />
+                                    <Calendar
+                                        size={13}
+                                        className="text-amber-500"
+                                    />
                                     Due Date Range
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <span className="text-[11px] text-slate-400">From</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            From
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempDueStartDate}
-                                            onChange={(e) => setTempDueStartDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempDueStartDate(
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-slate-400">To</span>
+                                        <span className="text-[11px] text-slate-400">
+                                            To
+                                        </span>
                                         <input
                                             type="date"
                                             value={tempDueEndDate}
                                             min={tempDueStartDate}
-                                            onChange={(e) => setTempDueEndDate(e.target.value)}
+                                            onChange={(e) =>
+                                                setTempDueEndDate(
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-600 focus:bg-white focus:outline-none"
                                         />
                                     </div>
@@ -804,6 +1181,26 @@ export const OrdersPage: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* MODAL UPDATE PENGIRIMAN */}
+            <UpdateDeliveryModal
+                isOpen={!!orderToUpdateDelivery}
+                orderNo={orderToUpdateDelivery?.orderNo || ''}
+                currentStatus={
+                    orderToUpdateDelivery?.deliveryStatus || 'NOT_SHIPPED'
+                }
+                isLoading={deliveryMutation.isPending}
+                customerName={orderToUpdateDelivery?.customer?.name!}
+                onClose={() => setOrderToUpdateDelivery(null)}
+                onConfirm={(deliveryStatus, shippedAt) => {
+                    if (orderToUpdateDelivery) {
+                        deliveryMutation.mutate({
+                            id: orderToUpdateDelivery.id,
+                            deliveryStatus,
+                            shippedAt,
+                        });
+                    }
+                }}
+            />
 
             {/* Modal Dialog Konfirmasi Batal */}
             <ConfirmCancelOrderModal

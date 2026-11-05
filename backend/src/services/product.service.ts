@@ -51,6 +51,37 @@ export class ProductService {
         });
     }
 
+    async massCreateProducts(items: CreateProductDTO[]) {
+        if (!items?.length) {
+            throw new AppError('Daftar produk tidak boleh kosong', 400);
+        }
+
+        // 1. Validasi duplikasi internal file Excel
+        const names = items.map((i) => i.name?.trim()).filter(Boolean);
+        if (new Set(names.map((n) => n.toLowerCase())).size !== items.length) {
+            throw new AppError(
+                'Terdapat nama produk duplikat di dalam file',
+                400
+            );
+        }
+
+        // 2. Ambil prefix sequence kode produk terakhir sekaligus
+        const baseCode = await generateProductCode(); // Misal: GBR0045
+        const prefix = baseCode.slice(0, 3);
+        const startSeq = parseInt(baseCode.slice(3), 10) || 1;
+
+        // 3. Susun payload bersih dengan SKU berurutan
+        const sanitizedItems = items.map((item, idx) => ({
+            code: `${prefix}${String(startSeq + idx).padStart(4, '0')}`,
+            name: item.name.trim(),
+            baseUnit: item.baseUnit.trim(),
+            costPrice: Math.max(0, Number(item.costPrice || 0)),
+            additionalUnits: item.additionalUnits || [],
+        }));
+
+        return productRepository.createManyWithUnits(sanitizedItems);
+    }
+
     async updateProduct(id: string, data: UpdateProductDTO) {
         const product = await productRepository.findById(id);
         if (!product) {

@@ -1,4 +1,4 @@
-import { OrderStatus } from '@prisma/client';
+import { DeliveryStatus, OrderStatus } from '@prisma/client';
 import { orderRepository } from '../repositories/order.repository';
 import {
     CreateOrderDTO,
@@ -78,9 +78,18 @@ export class OrderService {
             const baseQty = item.quantity * conversionQty;
             const subTotal = item.quantity * item.unitPrice;
             itemsTotal += subTotal;
-            
-            const costPrice = item.productId ? costMap.get(item.productId) ?? 0 : 0;
-            
+
+            if (item.unitPrice < (costMap.get(item.productId!) ?? 0) * item.conversionQty) {
+                throw new AppError(
+                    `Harga untuk ${item.name} lebih kecil dari HPP (${(costMap.get(item.productId!) ?? 0) * item.conversionQty})`,
+                    400
+                );
+            }
+
+            const costPrice = item.productId
+                ? (costMap.get(item.productId) ?? 0)
+                : 0;
+
             return {
                 productId: item.productId,
                 productUnitId: item.productUnitId,
@@ -246,6 +255,35 @@ export class OrderService {
             return cancelledOrder;
         });
     }
+
+    async updateDeliveryStatus(
+        id: string,
+        shippedAt?: string | null
+    ) {
+        const order = await orderRepository.findById(id);
+        if (!order) {
+            throw new AppError('Order tidak ditemukan', 404);
+        }
+
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new AppError(
+                'Tidak dapat memperbarui status pengiriman untuk order yang telah dibatalkan',
+                400
+            );
+        }
+        const deliveryStatus:DeliveryStatus='SHIPPED';
+        const parsedShippedAt= new Date(shippedAt ?? new Date());
+        
+
+        return orderRepository.updateDeliveryStatus(id, {
+            deliveryStatus,
+            shippedAt: parsedShippedAt,
+        });
+    }
 }
 
 export const orderService = new OrderService();
+function formatIDR(arg0: number) {
+    throw new Error('Function not implemented.');
+}
+

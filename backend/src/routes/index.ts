@@ -8,6 +8,7 @@ import productRouter from "./product.route";
 import paymentRouter from "./payment.route";
 import priceMatrixRouter from "./priceMatrix.route";
 import expenseRouter from "./expense.route";
+import dashboardRouter from "./dashboard.route";
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use("/products", productRouter);
 router.use("/payments", paymentRouter);
 router.use("/price-matrix", priceMatrixRouter);
 router.use("/expenses", expenseRouter);
+router.use("/dashboard", dashboardRouter);
 
 export default router;

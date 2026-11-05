@@ -10,9 +10,9 @@ import { OrderFormPage } from "@/pages/OrderFormPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { PaymentsPage } from "@/pages/PaymentPage";
 import { ExpensesPage } from "@/pages/ExpensePage";
+import { CustomerDetailPage } from "@/pages/CustomerDetailPage";
+import { DashboardPage } from "@/pages/DashboardPage";
 
-
-const DashboardPage = () => <div className="text-xl font-bold">Ringkasan Dashboard</div>;
 export const AppRoutes: React.FC = () => {
     return (
         <BrowserRouter>
@@ -26,8 +26,7 @@ export const AppRoutes: React.FC = () => {
                 <Route element={<ProtectedRoute/>}>
                     {/*Layout Wrapper with Sidebar & Header*/}
                     <Route element={<AppLayout/>}>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/" element={<Navigate to="/dashboard/summary" replace />} />
                         <Route path="/orders" element={<OrdersPage/>} />
                         <Route path="/orders/new" element={<OrderFormPage/>} />
                         <Route path="/orders/:id" element={<OrderFormPage/>} />
@@ -35,11 +34,13 @@ export const AppRoutes: React.FC = () => {
                         <Route path="/products" element={<ProductsPage />} />
                         <Route path="/prices" element={<PriceMatrixPage/>}/>
                         <Route path="/payments" element={<PaymentsPage/>}/>
-                        <Route path="/expenses" element={<ExpensesPage/>}/> 
+                        <Route path="/expenses" element={<ExpensesPage/>}/>
+                        <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                        <Route path="/dashboard/summary" element={<DashboardPage/>}/>
                     </Route>
                 </Route>
 
-                <Route path="*" element={<Navigate to='/dashboard' replace/>}/>   
+                <Route path="*" element={<Navigate to='/dashboard/summary' replace/>}/>   
             </Routes>
         </BrowserRouter>
     );

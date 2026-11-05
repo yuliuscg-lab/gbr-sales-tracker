@@ -31,16 +31,40 @@ export class ProductController {
         return success(res, 201, 'Produk berhasil ditambahkan', newProduct);
     }
 
+    async massUpload(req: Request, res: Response) {
+        const { products } = req.body;
+
+        if (!Array.isArray(products)) {
+            return res.status(400).json({
+                success: false,
+                message: "Payload harus berupa array 'products'",
+            });
+        }
+
+        const created = await productService.massCreateProducts(products);
+
+        return success(
+            res,
+            201,
+            `${created.length} produk berhasil ditambahkan secara massal`,
+            created
+        );
+    }
+
     async update(req: Request, res: Response) {
         const { id } = req.params;
         const { name, baseUnit, costPrice, additionalUnits } = req.body;
 
-        const updatedProduct = await productService.updateProduct(id.toString(), {
-            name,
-            baseUnit,
-            costPrice: costPrice !== undefined ? Number(costPrice) : undefined, // <-- Konversi number jika ada
-            additionalUnits,
-        });
+        const updatedProduct = await productService.updateProduct(
+            id.toString(),
+            {
+                name,
+                baseUnit,
+                costPrice:
+                    costPrice !== undefined ? Number(costPrice) : undefined, // <-- Konversi number jika ada
+                additionalUnits,
+            }
+        );
 
         return success(res, 200, 'Produk berhasil diperbarui', updatedProduct);
     }

@@ -10,6 +10,7 @@ export interface MatrixProductItem {
     code: string;
     name: string;
     baseUnit: string;
+    costPrice?: number;
     units: MatrixUnitItem[];
 }
 
