@@ -4,6 +4,7 @@ export const createProductSchema = z.object({
     code: z.string().optional(),
     name: z.string().min(4, "Nama minimal 4 karakter!").trim(),
     baseUnit: z.string().min(1, "Unit dasar minimal 1 karakter!").trim(),
+    isProductionItem: z.boolean(),
     costPrice: z.coerce.number().min(0, "HPP tidak boleh negatif").optional().default(0),
     additionalUnits: z.array(
         z.object({
@@ -16,6 +17,7 @@ export const createProductSchema = z.object({
 export const updateProductSchema = z.object({
     name: z.string().min(4, "Nama minimal 4 karakter!").trim().optional(),
     baseUnit: z.string().min(1, "Unit dasar minimal 1 karakter!").trim().optional(),
+    isProductionItem: z.boolean().optional(),
     costPrice: z.coerce.number().min(0, "HPP tidak boleh negatif").optional(),
     additionalUnits: z.array(
         z.object({

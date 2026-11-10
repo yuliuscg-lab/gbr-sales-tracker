@@ -123,7 +123,7 @@ export const DashboardPage: React.FC = () => {
                 <div className="flex gap-2">
                 {/* Global Date Filter */}
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xs text-xs">
-                    <Calendar size={14} className="text-blue-600 ml-1.5" />
+                    <Calendar size={14} className="text-blue-600 ml-1.5 hidden sm:block" />
                     <input
                         type="date"
                         value={startDate}
@@ -147,7 +147,7 @@ export const DashboardPage: React.FC = () => {
                         title="Reset ke Bulan Berjalan"
                         className="cursor-pointer p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100"
                     >
-                        <RotateCcw size={14} />
+                        <RotateCcw size={12} />
                     </button>
                 </div>
                 {/* Tombol SYNC di Sebelah Kanan Filter Tanggal */}
@@ -159,7 +159,7 @@ export const DashboardPage: React.FC = () => {
                     title="Refetch dan Recalculate semua metrik"
                 >
                     <RefreshCw size={14} className={`${isSyncing ? 'animate-spin text-slate-600' : 'text-slate-600'}`} />
-                    <span>Sync</span>
+                    <span className="hidden sm:block">Sync</span>
                 </button>
             </div>
             </div>
@@ -185,10 +185,10 @@ export const DashboardPage: React.FC = () => {
                                 />
                             </div>
                             <div className="mt-3">
-                                <div className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                                <div className="text-md sm:text-xl font-bold text-slate-900 truncate">
                                     {formatIDR(fin?.grossRevenue || 0)}
                                 </div>
-                                <div className="mt-1 flex items-center justify-between text-[12px] text-slate-500">
+                                <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500">
                                     <span>Payment Realization:</span>
                                     <span className="font-semibold text-emerald-600">
                                         {formatIDR(fin?.realizedRevenue || 0)} (
@@ -208,10 +208,10 @@ export const DashboardPage: React.FC = () => {
                                 />
                             </div>
                             <div className="mt-3">
-                                <div className="text-lg sm:text-xl font-bold text-emerald-800 truncate">
+                                <div className="text-md sm:text-xl font-bold text-emerald-800 truncate">
                                     {formatIDR(fin?.netProfit || 0)}
                                 </div>
-                                <p className="mt-1 text-[12px] text-emerald-600/80">
+                                <p className="mt-1 text-[10px] text-emerald-600/80">
                                     Gross Profit - Operating Expenses
                                 </p>
                             </div>
@@ -227,7 +227,7 @@ export const DashboardPage: React.FC = () => {
                                 />
                             </div>
                             <div className="mt-2 space-y-1">
-                                <div className="flex items-center justify-between text-xs md:text-sm">
+                                <div className="flex items-center justify-between text-[10px] md:text-sm">
                                     <span className="flex items-center gap-1 text-emerald-600 font-medium">
                                         <ArrowDownRight size={13} /> Cash In:
                                     </span>
@@ -235,7 +235,7 @@ export const DashboardPage: React.FC = () => {
                                         {formatIDR(fin?.totalCashIn || 0)}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between text-xs md:text-sm">
+                                <div className="flex items-center justify-between text-[10px] md:text-sm">
                                     <span className="flex items-center gap-1 text-rose-600 font-medium">
                                         <ArrowUpRight size={13} /> Cash Out:
                                     </span>
@@ -256,10 +256,10 @@ export const DashboardPage: React.FC = () => {
                                 />
                             </div>
                             <div className="mt-3">
-                                <div className="text-lg sm:text-xl font-bold text-amber-900 truncate">
+                                <div className="text-md sm:text-xl font-bold text-amber-900 truncate">
                                     {formatIDR(fin?.totalOutstandingDebt || 0)}
                                 </div>
-                                <p className="mt-1 text-[12px] text-amber-700">
+                                <p className="mt-1 text-[10px] text-amber-700">
                                     Total unpaid/partially paid invoices
                                 </p>
                             </div>

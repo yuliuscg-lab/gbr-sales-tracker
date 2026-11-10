@@ -41,7 +41,7 @@ import {
 } from '@/components/orders/ViewDetailsModal';
 import { downloadInvoiceJpg, downloadInvoicePdf } from '@/utils/generateInvoicePdf';
 import { UpdateDeliveryModal } from '@/components/orders/UpdateDeliveryModal';
-import { downloadProductionCardPdf } from '@/utils/generateProductionCardPdf';
+import { downloadPackingListPdf } from '@/utils/generatePackingListPdf';
 import { downloadDeliveryOrderPdf } from '@/utils/generateDeliveryOrderPdf';
 
 type SortOption =
@@ -751,7 +751,7 @@ export const OrdersPage: React.FC = () => {
                                                         className="absolute right-0 bottom-full mb-2 z-30 w-48 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg animate-in fade-in zoom-in-95"
                                                     >
                                                         <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                                                            Pilih Berkas PDF
+                                                            Choose File
                                                         </div>
 
                                                         {/* Opsi 1: Invoice PDF */}
@@ -814,7 +814,7 @@ export const OrdersPage: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => {
-                                                                downloadProductionCardPdf(
+                                                                downloadPackingListPdf(
                                                                     ord
                                                                 );
                                                                 setOpenDownloadMenuId(
@@ -829,8 +829,7 @@ export const OrdersPage: React.FC = () => {
                                                             />
                                                             <div className="flex flex-col">
                                                                 <span className="font-semibold">
-                                                                    Kartu
-                                                                    Produksi
+                                                                    Packing List
                                                                 </span>
                                                             </div>
                                                         </button>

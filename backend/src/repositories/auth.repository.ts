@@ -1,53 +1,79 @@
-import { prisma } from "../config/prisma";
+import { prisma } from '../config/prisma';
 
 export class AuthRepository {
-    async findUserByUsername(username:string) {
+    async findUserByUsername(username: string) {
         return prisma.user.findUnique({
-            where: {username}
+            where: { username },
         });
     }
 
-    async findUserById(id:string) {
+    async findUserById(id: string) {
         return prisma.user.findUnique({
-            where: {id}
+            where: { id },
         });
     }
 
-    async createRefreshToken( data: {
+    async createRefreshToken(data: {
         jti: string;
-        tokenHash:string;
+        tokenHash: string;
         userId: string;
         expiresAt: Date;
     }) {
         return prisma.refreshToken.create({
-            data
+            data,
         });
     }
 
-    async findRefreshTokenByJti(jti:string) {
+    async findRefreshTokenByJti(jti: string) {
         return prisma.refreshToken.findUnique({
-            where: {jti},
+            where: { jti },
             include: {
-                user:true
-            }
+                user: true,
+            },
         });
     }
 
-    async revokeRefreshToken(id:string) {
+    async revokeRefreshToken(id: string) {
         return prisma.refreshToken.update({
-            where: {id},
+            where: { id },
             data: {
-                revokedAt: new Date()
-            }
+                revokedAt: new Date(),
+            },
         });
     }
 
     async revokeAllUserTokens(userId: string) {
         return prisma.refreshToken.updateMany({
-            where: {userId, revokedAt: null},
+            where: { userId, revokedAt: null },
             data: {
-                revokedAt: new Date()
-            }
+                revokedAt: new Date(),
+            },
+        });
+    }
+
+    async cleanStaleTokens(retentionDays = 7) {
+        const retentionThreshold = new Date(
+            Date.now() - retentionDays * 24 * 60 * 60 * 1000
+        );
+
+        return prisma.refreshToken.deleteMany({
+            where: {
+                OR: [
+                    // 1. Token yang memang sudah expired
+                    {
+                        expiresAt: {
+                            lt: new Date(),
+                        },
+                    },
+                    // 2. Token yang sudah di-revoke dan melewati masa retensi (misal 7 hari)
+                    {
+                        revokedAt: {
+                            not: null,
+                            lt: retentionThreshold,
+                        },
+                    },
+                ],
+            },
         });
     }
 }

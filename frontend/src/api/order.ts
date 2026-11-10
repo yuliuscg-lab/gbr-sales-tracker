@@ -10,6 +10,7 @@ export type DeliveryStatus = 'NOT_SHIPPED' | 'SHIPPED';
 export interface OrderItem {
     id: string;
     name: string;
+    isProductionItem: boolean;
     unitName: string;
     quantity: number;
     unitPrice: number;

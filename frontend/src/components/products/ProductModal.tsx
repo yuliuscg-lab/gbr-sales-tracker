@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, Plus, Trash2, Loader2, Package, Coins } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, Package, Coins, Factory } from 'lucide-react';
 import {
     productSchema,
     ProductFormData,
@@ -37,6 +37,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             name: '',
             baseUnit: 'Pcs',
             costPrice: 0,
+            isProductionItem: true, // Default aktif
             additionalUnits: [],
         },
     });
@@ -48,6 +49,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
     const baseUnitValue = watch('baseUnit') || 'Pcs';
     const rawCostPrice = watch('costPrice');
+    const isProductionItemValue = watch('isProductionItem');
 
     useEffect(() => {
         if (initialData) {
@@ -63,6 +65,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 name: initialData.name,
                 baseUnit: initialData.baseUnit,
                 costPrice: initialData.costPrice ?? 0,
+                isProductionItem: initialData.isProductionItem ?? true,
                 additionalUnits: nonBaseUnits,
             });
         } else {
@@ -70,6 +73,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 name: '',
                 baseUnit: 'Pcs',
                 costPrice: 0,
+                isProductionItem: true,
                 additionalUnits: [],
             });
         }
@@ -154,42 +158,60 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
                         {/* Input HPP (Cost Price) */}
                         <div>
-    <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-        <Coins size={13} className="text-amber-500" />
-        Cost per Base Unit *
-    </label>
-    <div className="relative">
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">
-            Rp
-        </span>
-        <input
-            type="text"
-            inputMode="numeric"
-            placeholder="0"
-            // JANGAN gunakan {...register('costPrice')} di sini agar tidak konflik dengan format string IDR
-            value={
-                rawCostPrice !== undefined && rawCostPrice !== null
-                    ? Number(rawCostPrice).toLocaleString('id-ID')
-                    : ''
-            }
-            onChange={(e) => {
-                // Bersihkan karakter selain angka
-                const clean = e.target.value.replace(/\D/g, '');
-                const val = clean ? parseInt(clean, 10) : 0;
-                setValue('costPrice', val, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                });
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-        />
-    </div>
-    {errors.costPrice && (
-        <p className="mt-1 text-[11px] text-rose-600">
-            {errors.costPrice.message}
-        </p>
-    )}
-</div>
+                            <label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                <Coins size={13} className="text-amber-500" />
+                                Cost per Base Unit *
+                            </label>
+                            <div className="relative">
+                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">
+                                    Rp
+                                </span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    value={
+                                        rawCostPrice !== undefined && rawCostPrice !== null
+                                            ? Number(rawCostPrice).toLocaleString('id-ID')
+                                            : ''
+                                    }
+                                    onChange={(e) => {
+                                        const clean = e.target.value.replace(/\D/g, '');
+                                        const val = clean ? parseInt(clean, 10) : 0;
+                                        setValue('costPrice', val, {
+                                            shouldValidate: true,
+                                            shouldDirty: true,
+                                        });
+                                    }}
+                                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+                            {errors.costPrice && (
+                                <p className="mt-1 text-[11px] text-rose-600">
+                                    {errors.costPrice.message}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* POSISI TOGGLE: Sifat Produk Produksi vs Trading */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 transition-colors">
+                        <label className="flex items-start gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                {...register('isProductionItem')}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <div className="flex-1">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                                    <Factory size={13} className={isProductionItemValue ? "text-blue-600" : "text-slate-400"} />
+                                    <span>Production Item</span>
+                                </div>
+                                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                                    Centang jika barang ini harus diproduksi atau di-repack. Uncheck jika barang langsung siap jual/kirim.
+                                </p>
+                            </div>
+                        </label>
                     </div>
 
                     {/* 3. Daftar Satuan Grosir Tambahan */}

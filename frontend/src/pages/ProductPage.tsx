@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Package, Plus, Edit2, Trash2, Loader2, Tag, UploadCloud, ChevronDown } from 'lucide-react';
+import { Package, Plus, Edit2, Trash2, Loader2, Tag, UploadCloud } from 'lucide-react';
 import { productApi } from '../api/product';
 import { ProductFormData } from '../validation/product.validation';
 import { Product } from '../types/product.type';
@@ -75,7 +75,7 @@ export const ProductsPage: React.FC = () => {
         mutationFn: async (items: ProductFormData[]) => productApi.createMany(items),
         onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
-            showToast(`${res.count} produk berhasil didaftarkan secara massal`);
+            showToast(`${res.length} produk berhasil didaftarkan secara massal`);
             setIsMassUploadOpen(false);
         },
         onError: () => {
@@ -150,7 +150,7 @@ export const ProductsPage: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                     {/* Tombol Opsi Mass Upload */}
-                    <div className="relative" ref={massMenuRef}>
+                    <div className="relative hidden sm:block" ref={massMenuRef}>
                         <button
                             type="button"
                             onClick={() => setIsMassUploadOpen(!isMassUploadOpen)}
@@ -159,8 +159,6 @@ export const ProductsPage: React.FC = () => {
                             <UploadCloud size={16} className="text-slate-500" />
                             <span>Mass Upload</span>
                         </button>
-
-                        
                     </div>
 
                     {/* Tombol Add New Product */}

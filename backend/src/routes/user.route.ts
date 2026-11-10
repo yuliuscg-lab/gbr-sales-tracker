@@ -4,9 +4,8 @@ import { authenticate } from "../middlewares/auth.middleware";
 
 const router = Router();
 
-router.post("/", userController.create);
-
 router.use(authenticate);
+router.post("/", userController.create);
 router.get("/", userController.getAll);
 router.get("/:id", userController.getById);
 

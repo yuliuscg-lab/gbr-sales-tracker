@@ -73,7 +73,7 @@ export class OrderRepository {
                         id: true,
                         name: true,
                         phone: true,
-                        city:true,
+                        city: true,
                     },
                 },
                 items: true,
@@ -138,15 +138,109 @@ export class OrderRepository {
         });
     }
 
-    async update(id: string, data: UpdateOrderDTO) {
-        return prisma.order.update({
-            where: { id },
-            data,
-            include: {
-                customer: true,
-                items: true,
-                payments: true,
-            },
+    async update(
+        orderId: string,
+        data: {
+            deliveryDate?: Date;
+            dueDate?: Date | null;
+            notes?: string | null;
+            deliveryFee?: number;
+            totalAmount?: number;
+            status?: OrderStatus;
+            items?: {
+                productId: string | null;
+                name: string;
+                unitName: string;
+                conversionQty: number;
+                baseQty: number;
+                quantity: number;
+                unitPrice: number;
+                costPrice: number;
+                subTotal: number;
+                isProductionItem?: boolean;
+            }[];
+        },
+        priceMatrixUpdates?: {
+            customerId: string;
+            productUnitId: string;
+            price: number;
+        }[]
+    ) {
+        return prisma.$transaction(async (tx) => {
+            // 1. Jika ada perubahan item, hapus item lama dan buat item baru
+            if (data.items) {
+                await tx.orderItem.deleteMany({
+                    where: { orderId },
+                });
+
+                await tx.orderItem.createMany({
+                    data: data.items.map((item) => ({
+                        orderId,
+                        productId: item.productId,
+                        name: item.name,
+                        unitName: item.unitName,
+                        conversionQty: item.conversionQty,
+                        baseQty: item.baseQty,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        costPrice: item.costPrice,
+                        subTotal: item.subTotal,
+                        isProductionItem: item.isProductionItem ?? true,
+                    })),
+                });
+            }
+
+            // 2. Update record Order
+            const updatedOrder = await tx.order.update({
+                where: { id: orderId },
+                data: {
+                    ...(data.deliveryDate !== undefined && {
+                        deliveryDate: data.deliveryDate,
+                    }),
+                    ...(data.dueDate !== undefined && {
+                        dueDate: data.dueDate,
+                    }),
+                    ...(data.notes !== undefined && { notes: data.notes }),
+                    ...(data.deliveryFee !== undefined && {
+                        deliveryFee: data.deliveryFee,
+                    }),
+                    ...(data.totalAmount !== undefined && {
+                        totalAmount: data.totalAmount,
+                    }),
+                    ...(data.status !== undefined && { status: data.status }),
+                },
+                include: {
+                    customer: true,
+                    items: true,
+                    payments: {
+                        where: { deletedAt: null },
+                    },
+                },
+            });
+
+            // 3. Upsert harga baru ke CustomerProductPrice
+            if (priceMatrixUpdates && priceMatrixUpdates.length > 0) {
+                for (const p of priceMatrixUpdates) {
+                    await tx.customerProductPrice.upsert({
+                        where: {
+                            customerId_productUnitId: {
+                                customerId: p.customerId,
+                                productUnitId: p.productUnitId,
+                            },
+                        },
+                        create: {
+                            customerId: p.customerId,
+                            productUnitId: p.productUnitId,
+                            price: p.price,
+                        },
+                        update: {
+                            price: p.price,
+                        },
+                    });
+                }
+            }
+
+            return updatedOrder;
         });
     }
 

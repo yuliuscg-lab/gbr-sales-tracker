@@ -60,13 +60,15 @@ export class OrderController {
 
     async update(req: Request, res: Response) {
         const { id } = req.params;
-        const { dueDate, notes, status, deliveryDate } = req.body;
+        const { deliveryDate, dueDate, notes, deliveryFee, items } = req.body;
 
         const updatedOrder = await orderService.updateOrder(id.toString(), {
+            deliveryDate,
             dueDate,
             notes,
-            status,
-            deliveryDate,
+            deliveryFee:
+                deliveryFee !== undefined ? Number(deliveryFee) : undefined,
+            items,
         });
 
         return success(res, 200, 'Order berhasil diperbarui', updatedOrder);

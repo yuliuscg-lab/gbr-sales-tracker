@@ -58,6 +58,10 @@ export class OrderService {
             products.map((p) => [p.id, Number(p.costPrice || 0)])
         );
 
+        const isProductionMap = new Map <string, boolean>(
+            products.map((p) => [p.id, p.isProductionItem??true])
+        );
+
         let itemsTotal = 0;
         const computedItems: CreateOrderItemDTO[] = input.items.map((item) => {
             if (item.quantity <= 0) {
@@ -79,7 +83,10 @@ export class OrderService {
             const subTotal = item.quantity * item.unitPrice;
             itemsTotal += subTotal;
 
-            if (item.unitPrice < (costMap.get(item.productId!) ?? 0) * item.conversionQty) {
+            if (
+                item.unitPrice <
+                (costMap.get(item.productId!) ?? 0) * item.conversionQty
+            ) {
                 throw new AppError(
                     `Harga untuk ${item.name} lebih kecil dari HPP (${(costMap.get(item.productId!) ?? 0) * item.conversionQty})`,
                     400
@@ -89,6 +96,8 @@ export class OrderService {
             const costPrice = item.productId
                 ? (costMap.get(item.productId) ?? 0)
                 : 0;
+            
+            const isProductionItem = item.productId ? (isProductionMap.get(item.productId) ?? true) : true;
 
             return {
                 productId: item.productId,
@@ -101,6 +110,7 @@ export class OrderService {
                 unitPrice: item.unitPrice,
                 costPrice,
                 subTotal,
+                isProductionItem,
             };
         });
 
@@ -134,6 +144,7 @@ export class OrderService {
                             unitPrice: item.unitPrice,
                             costPrice: item.costPrice,
                             subTotal: item.subTotal,
+                            isProductionItem: item.isProductionItem
                         })),
                     },
                 },
@@ -168,54 +179,179 @@ export class OrderService {
         });
     }
 
-    async updateOrder(
-        id: string,
-        data: {
-            dueDate?: string | null;
-            notes?: string | null;
-            status?: OrderStatus;
-            deliveryDate?: string;
+    async updateOrder(id: string, input: UpdateOrderDTO) {
+        const existingOrder = await orderRepository.findById(id);
+        if (!existingOrder) {
+            throw new AppError('Order tidak ditemukan', 404);
         }
-    ) {
+
+        if (existingOrder.status === OrderStatus.CANCELLED) {
+            throw new AppError(
+                'Tidak dapat mengubah order yang telah dibatalkan',
+                400
+            );
+        }
+
+        let parsedDeliveryDate: Date | null | undefined = undefined;
+        if (input.deliveryDate !== undefined) {
+            parsedDeliveryDate = input.deliveryDate
+                ? new Date(input.deliveryDate)
+                : null;
+        }
+
+        let parsedDueDate: Date | null | undefined = undefined;
+        if (input.dueDate !== undefined) {
+            parsedDueDate = input.dueDate ? new Date(input.dueDate) : null;
+        }
+
+        const notes =
+            input.notes !== undefined ? input.notes?.trim() || null : undefined;
+        const deliveryFee =
+            input.deliveryFee !== undefined
+                ? Number(input.deliveryFee)
+                : existingOrder.deliveryFee;
+
+        // Jika items dikirim, lakukan re-kalkulasi penuh
+        if (input.items && input.items.length > 0) {
+            // 1. Ambil snapshot HPP dari tabel Product
+            const productIds = input.items
+                .map((i) => i.productId)
+                .filter(Boolean) as string[];
+            const products = await prisma.product.findMany({
+                where: { id: { in: productIds } },
+                select: { id: true, costPrice: true, isProductionItem: true },
+            });
+            const costMap = new Map(products.map((p) => [p.id, p.costPrice]));
+            const isProductionMap = new Map<string, boolean>(
+                products.map((p) => [p.id, p.isProductionItem ?? true])
+            );
+
+            let calculatedSubtotal = 0;
+            const priceMatrixUpdates: {
+                customerId: string;
+                productUnitId: string;
+                price: number;
+            }[] = [];
+
+            const computedItems = input.items.map((item) => {
+                if (!item.name || item.name.trim() === '') {
+                    throw new AppError('Nama produk tidak boleh kosong', 400);
+                }
+                if (Number(item.quantity) <= 0) {
+                    throw new AppError(
+                        `Jumlah untuk ${item.name} harus lebih dari 0`,
+                        400
+                    );
+                }
+                if (Number(item.unitPrice) < 0) {
+                    throw new AppError(
+                        `Harga untuk ${item.name} tidak boleh negatif`,
+                        400
+                    );
+                }
+
+                const conversionQty =
+                    Number(item.conversionQty) > 0
+                        ? Number(item.conversionQty)
+                        : 1;
+                const baseQty = Number(item.quantity) * conversionQty;
+                const subTotal = Number(item.quantity) * Number(item.unitPrice);
+                calculatedSubtotal += subTotal;
+
+                const costPrice = item.productId
+                    ? (costMap.get(item.productId) ?? 0)
+                    : 0;
+
+                const isProductionItem = item.productId
+                    ? (isProductionMap.get(item.productId) ?? true)
+                    : true;
+
+                // Kumpulkan untuk auto-update price matrix
+                if (item.productUnitId) {
+                    priceMatrixUpdates.push({
+                        customerId: existingOrder.customerId,
+                        productUnitId: item.productUnitId,
+                        price: Number(item.unitPrice),
+                    });
+                }
+
+                return {
+                    productId: item.productId || null,
+                    name: item.name.trim(),
+                    unitName: item.unitName?.trim() || 'Pcs',
+                    conversionQty,
+                    baseQty,
+                    quantity: Number(item.quantity),
+                    unitPrice: Number(item.unitPrice),
+                    costPrice,
+                    subTotal,
+                    isProductionItem,
+                };
+            });
+
+            const newTotalAmount = calculatedSubtotal + deliveryFee;
+
+            // 2. Evaluasi status pembayaran terhadap total baru
+            const paidAmount = Number(existingOrder.paidAmount || 0);
+            let newStatus: OrderStatus = existingOrder.status;
+
+            if (paidAmount <= 0) {
+                newStatus = OrderStatus.UNPAID;
+            } else if (paidAmount >= newTotalAmount) {
+                newStatus = OrderStatus.PAID;
+            } else {
+                newStatus = OrderStatus.PARTIALLY_PAID;
+            }
+
+            // 3. Eksekusi update
+            const updatedOrder = await orderRepository.update(
+                id,
+                {
+                    deliveryDate: parsedDeliveryDate!,
+                    dueDate: parsedDueDate,
+                    notes,
+                    deliveryFee,
+                    totalAmount: newTotalAmount,
+                    status: newStatus,
+                    items: computedItems,
+                },
+                priceMatrixUpdates
+            );
+
+            // 4. Sinkronkan metrik order customer
+            await customerRepository.syncOrderMetrics(existingOrder.customerId);
+
+            return updatedOrder;
+        }
+
+        // Jika HANYA mengubah tanggal/catatan/ongkir tanpa item
+        return orderRepository.update(id, {
+            deliveryDate: parsedDeliveryDate!,
+            dueDate: parsedDueDate,
+            notes,
+            deliveryFee,
+        });
+    }
+
+    async updateDeliveryStatus(id: string, shippedAt?: string | null) {
         const order = await orderRepository.findById(id);
         if (!order) {
             throw new AppError('Order tidak ditemukan', 404);
         }
 
-        //1. Kunci total jika invoice sudah lunas
-        if (order.status === OrderStatus.PAID) {
+        if (order.status === OrderStatus.CANCELLED) {
             throw new AppError(
-                'Order yang sudah lunas tidak bisa diubah kembali',
+                'Tidak dapat memperbarui status pengiriman untuk order yang telah dibatalkan',
                 400
             );
         }
+        const deliveryStatus: DeliveryStatus = 'SHIPPED';
+        const parsedShippedAt = new Date(shippedAt ?? new Date());
 
-        //2. Perubahan status invoice hanya di-trigger oleh payment
-        if (data.status && data.status !== order.status) {
-            throw new AppError(
-                'Perubahan status invoice hanya dapat dilakukan melalui pencatatan pembayaran',
-                400
-            );
-        }
-
-        //3. Hanya izinkan perubahan metadata non-nominal
-        const updatePayload: UpdateOrderDTO = {};
-
-        if (data.dueDate !== undefined) {
-            updatePayload.dueDate = data.dueDate
-                ? new Date(data.dueDate)
-                : null;
-        }
-
-        if (data.notes !== undefined) {
-            updatePayload.notes = data.notes?.trim() || null;
-        }
-
-        if (data.deliveryDate !== undefined) {
-            updatePayload.deliveryDate = new Date(data.deliveryDate);
-        }
-
-        return orderRepository.update(id, updatePayload);
+        return orderRepository.updateDeliveryStatus(id, {
+            deliveryStatus,
+            shippedAt: parsedShippedAt,
+        });
     }
 
     async cancelOrder(id: string, reason?: string) {
@@ -255,35 +391,6 @@ export class OrderService {
             return cancelledOrder;
         });
     }
-
-    async updateDeliveryStatus(
-        id: string,
-        shippedAt?: string | null
-    ) {
-        const order = await orderRepository.findById(id);
-        if (!order) {
-            throw new AppError('Order tidak ditemukan', 404);
-        }
-
-        if (order.status === OrderStatus.CANCELLED) {
-            throw new AppError(
-                'Tidak dapat memperbarui status pengiriman untuk order yang telah dibatalkan',
-                400
-            );
-        }
-        const deliveryStatus:DeliveryStatus='SHIPPED';
-        const parsedShippedAt= new Date(shippedAt ?? new Date());
-        
-
-        return orderRepository.updateDeliveryStatus(id, {
-            deliveryStatus,
-            shippedAt: parsedShippedAt,
-        });
-    }
 }
 
 export const orderService = new OrderService();
-function formatIDR(arg0: number) {
-    throw new Error('Function not implemented.');
-}
-

@@ -18,12 +18,13 @@ export class ProductController {
     }
 
     async create(req: Request, res: Response) {
-        const { code, name, baseUnit, costPrice, additionalUnits } = req.body;
+        const { code, name, baseUnit, costPrice, isProductionItem, additionalUnits } = req.body;
 
         const newProduct = await productService.createProduct({
             code,
             name,
             baseUnit,
+            isProductionItem,
             costPrice: costPrice !== undefined ? Number(costPrice) : 0, // <-- Konversi number
             additionalUnits,
         });
@@ -53,13 +54,14 @@ export class ProductController {
 
     async update(req: Request, res: Response) {
         const { id } = req.params;
-        const { name, baseUnit, costPrice, additionalUnits } = req.body;
+        const { name, baseUnit, costPrice, isProductionItem, additionalUnits } = req.body;
 
         const updatedProduct = await productService.updateProduct(
             id.toString(),
             {
                 name,
                 baseUnit,
+                isProductionItem,
                 costPrice:
                     costPrice !== undefined ? Number(costPrice) : undefined, // <-- Konversi number jika ada
                 additionalUnits,

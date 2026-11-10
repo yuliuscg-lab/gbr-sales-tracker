@@ -30,8 +30,6 @@ import { orderApi } from '../api/order';
 import {
     createOrderSchema,
     OrderFormData,
-    UpdateOrderFormData,
-    updateOrderSchema,
 } from '../validation/order.validation';
 import { Product } from '../types/product.type';
 import { Customer } from '@/types/customer.type';
@@ -55,19 +53,25 @@ export const OrderFormPage: React.FC = () => {
     const customerDropdownRef = useRef<HTMLDivElement>(null);
 
     // Modal Konfirmasi Pergantian Customer (Hanya saat Create)
-    const [pendingCustomer, setPendingCustomer] = useState<Customer | null>(null);
+    const [pendingCustomer, setPendingCustomer] = useState<Customer | null>(
+        null
+    );
 
     // Autocomplete Produk per Baris
     const [productSearches, setProductSearches] = useState<{
         [key: number]: string;
     }>({});
-    const [activeProductDropdown, setActiveProductDropdown] = useState<number | null>(null);
+    const [activeProductDropdown, setActiveProductDropdown] = useState<
+        number | null
+    >(null);
     const productDropdownRefs = useRef<{
         [key: number]: HTMLDivElement | null;
     }>({});
 
     // Melacak baris item yang sedang aktif di field harga
-    const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
+    const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(
+        null
+    );
 
     const formatDateForInput = (dateValue?: string | Date | null) => {
         if (!dateValue) return '';
@@ -96,9 +100,7 @@ export const OrderFormPage: React.FC = () => {
         reset,
         formState: { errors, isSubmitting },
     } = useForm<OrderFormData>({
-        resolver: zodResolver(
-            isEditMode ? (updateOrderSchema as any) : createOrderSchema
-        ),
+        resolver: zodResolver(createOrderSchema),
         defaultValues: {
             customerId: '',
             orderNo: '',
@@ -126,8 +128,11 @@ export const OrderFormPage: React.FC = () => {
     });
 
     // Modal register new product
-    const [isRegisterProductModalOpen, setIsRegisterProductModalOpen] = useState(false);
-    const [registerProductError, setRegisterProductError] = useState<string | null>(null);
+    const [isRegisterProductModalOpen, setIsRegisterProductModalOpen] =
+        useState(false);
+    const [registerProductError, setRegisterProductError] = useState<
+        string | null
+    >(null);
 
     const handleOpenRegisterProductModal = () => {
         setRegisterProductError(null);
@@ -162,8 +167,11 @@ export const OrderFormPage: React.FC = () => {
     };
 
     // Modal Register New Customer
-    const [isRegisterCustomerModalOpen, setIsRegisterCustomerModalOpen] = useState(false);
-    const [registerCustomerError, setRegisterCustomerError] = useState<string | null>(null);
+    const [isRegisterCustomerModalOpen, setIsRegisterCustomerModalOpen] =
+        useState(false);
+    const [registerCustomerError, setRegisterCustomerError] = useState<
+        string | null
+    >(null);
 
     const handleOpenRegisterCustomerModal = () => {
         setRegisterCustomerError(null);
@@ -211,30 +219,60 @@ export const OrderFormPage: React.FC = () => {
     });
 
     // Fetch Produk
-    const { data: products = [] } = useQuery({
+    const { data: products = [], isLoading: isProductsLoading } = useQuery({
         queryKey: ['products'],
         queryFn: () => productApi.getAll(),
     });
 
-    // Fetch Matrix Harga Customer Terpilih
+    // Fetch Matrix Harga Customer Terpilih (di-fetch pada Edit Mode juga agar produk baru dapat harga customer)
     const { data: customerPriceMatrix = [] } = useQuery({
         queryKey: ['price-matrix', selectedCustomerId],
         queryFn: () => priceMatrixApi.getByCustomerId(selectedCustomerId),
-        enabled: !!selectedCustomerId && !isEditMode,
+        enabled: !!selectedCustomerId,
     });
+
+    const isEditInitializedRef = useRef(false);
 
     // Sinkronisasi data awal saat edit mode
     useEffect(() => {
-        if (isEditMode && existingOrder) {
-            const formattedItems = (existingOrder.items || []).map((item: any) => ({
-                productId: item.productId || item.product?.id || '',
-                productUnitId: item.productUnitId || item.unit?.id || '',
-                name: item.name || item.productName || item.product?.name || '',
-                unitName: item.unitName || item.unit?.unitName || '',
-                conversionQty: Number(item.conversionQty) || 1,
-                quantity: Number(item.quantity) || 1,
-                unitPrice: Number(item.unitPrice) || 0,
-            }));
+        if (
+            isEditMode &&
+            existingOrder &&
+            !isProductsLoading &&
+            !isEditInitializedRef.current
+        ) {
+            const formattedItems = (existingOrder.items || []).map(
+                (item: any) => {
+                    const prodId = item.productId || item.product?.id || '';
+                    const uName = item.unitName || item.unit?.unitName || '';
+                    const matchedProduct = products.find(
+                        (p) => p.id === prodId
+                    );
+                    const matchedUnit = matchedProduct?.units?.find(
+                        (u) =>
+                            u.unitName.trim().toLowerCase() ===
+                            uName.trim().toLowerCase()
+                    );
+
+                    return {
+                        productId: prodId,
+                        productUnitId:
+                            item.productUnitId ||
+                            item.unit?.id ||
+                            matchedUnit?.id ||
+                            '',
+                        name:
+                            item.name ||
+                            item.productName ||
+                            item.product?.name ||
+                            '',
+                        unitName: uName,
+                        conversionQty: Number(item.conversionQty) || 1,
+                        quantity: Number(item.quantity) || 1,
+                        unitPrice: Number(item.unitPrice) || 0,
+                    };
+                }
+            );
 
             reset({
                 customerId: existingOrder.customerId || '',
@@ -255,8 +293,9 @@ export const OrderFormPage: React.FC = () => {
                 initialSearches[idx] = item.name;
             });
             setProductSearches(initialSearches);
+            isEditInitializedRef.current = true;
         }
-    }, [isEditMode, existingOrder, reset]);
+    }, [isEditMode, existingOrder, isProductsLoading, products, reset]);
 
     const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
@@ -339,6 +378,7 @@ export const OrderFormPage: React.FC = () => {
         setPendingCustomer(null);
     };
 
+    // Lookup harga otomatis hanya untuk create mode saat ganti customer
     useEffect(() => {
         if (
             !isEditMode &&
@@ -367,7 +407,6 @@ export const OrderFormPage: React.FC = () => {
     };
 
     const handleSelectProduct = (index: number, product: Product) => {
-        if (isEditMode) return;
         setValue(`items.${index}.productId`, product.id, {
             shouldValidate: true,
         });
@@ -383,7 +422,6 @@ export const OrderFormPage: React.FC = () => {
     };
 
     const handleClearSelectProduct = (index: number) => {
-        if (isEditMode) return;
         setValue(`items.${index}.productId`, '', { shouldValidate: true });
         setValue(`items.${index}.name`, '', { shouldValidate: true });
         setProductSearches((prev) => ({ ...prev, [index]: '' }));
@@ -395,7 +433,6 @@ export const OrderFormPage: React.FC = () => {
     };
 
     const handleUnitChange = (index: number, productUnitId: string) => {
-        if (isEditMode) return;
         const currentProductId = watch(`items.${index}.productId`);
         const prod = products.find((p) => p.id === currentProductId);
         if (!prod) return;
@@ -433,7 +470,6 @@ export const OrderFormPage: React.FC = () => {
     };
 
     const handleQtyChange = (index: number, delta: number) => {
-        if (isEditMode) return;
         const currentQty = Number(watch(`items.${index}.quantity`)) || 1;
         const newQty = Math.max(1, currentQty + delta);
         setValue(`items.${index}.quantity`, newQty, { shouldValidate: true });
@@ -455,12 +491,14 @@ export const OrderFormPage: React.FC = () => {
     const mutation = useMutation({
         mutationFn: (formData: OrderFormData) => {
             if (isEditMode) {
-                const updatePayload: UpdateOrderFormData = {
+                const updatePayload = {
                     deliveryDate: toISOStringOrNull(formData.deliveryDate),
                     dueDate: toISOStringOrNull(formData.dueDate),
                     notes: formData.notes?.trim() || '',
+                    deliveryFee: Number(formData.deliveryFee) || 0,
+                    items: formData.items,
                 };
-                return orderApi.update(id!, updatePayload);
+                return orderApi.update(id!, updatePayload as any);
             }
             return orderApi.create(formData);
         },
@@ -486,22 +524,20 @@ export const OrderFormPage: React.FC = () => {
         setServerError(null);
 
         // Validasi jagaan agar harga jual harus lebih besar dari HPP modal satuan terpilih
-        if (!isEditMode) {
-            for (let i = 0; i < data.items.length; i++) {
-                const item = data.items[i];
-                if (!item.productId) continue;
+        for (let i = 0; i < data.items.length; i++) {
+            const item = data.items[i];
+            if (!item.productId) continue;
 
-                const prod = products.find((p) => p.id === item.productId);
-                if (prod) {
-                    const hppPerBase = Number(prod.costPrice || 0);
-                    const totalHpp = hppPerBase * (Number(item.conversionQty) || 1);
+            const prod = products.find((p) => p.id === item.productId);
+            if (prod) {
+                const hppPerBase = Number(prod.costPrice || 0);
+                const totalHpp = hppPerBase * (Number(item.conversionQty) || 1);
 
-                    if (Number(item.unitPrice) <= totalHpp) {
-                        setServerError(
-                            `Harga untuk item "${item.name} (${item.unitName})" harus lebih besar dari modal HPP (${formatIDR(totalHpp)}).`
-                        );
-                        return;
-                    }
+                if (Number(item.unitPrice) <= totalHpp) {
+                    setServerError(
+                        `Harga untuk item "${item.name} (${item.unitName})" harus lebih besar dari modal HPP (${formatIDR(totalHpp)}).`
+                    );
+                    return;
                 }
             }
         }
@@ -520,7 +556,7 @@ export const OrderFormPage: React.FC = () => {
         (item) => item.name && item.name.trim() !== ''
     ).length;
 
-    if (isEditMode && isOrderLoading) {
+    if (isEditMode && (isOrderLoading || isProductsLoading)) {
         return (
             <div className="flex flex-col items-center justify-center py-24 text-slate-400">
                 <Loader2
@@ -727,7 +763,7 @@ export const OrderFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* PANEL 2: ORDER DETAILS (TERKUNCI SAAT EDIT) */}
+                {/* PANEL 2: ORDER DETAILS (BISA MENAMBAH & MENGURANGI PRODUK SAAT EDIT) */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
@@ -735,40 +771,34 @@ export const OrderFormPage: React.FC = () => {
                             <span>Order Details</span>
                         </h2>
 
-                        {isEditMode ? (
-                            <span className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                                <Lock size={12} />
-                            </span>
-                        ) : (
-                            <div className="flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleOpenRegisterProductModal}
-                                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-                                >
-                                    <Plus size={15} />
-                                    New Product
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        append({
-                                            productId: '',
-                                            productUnitId: '',
-                                            name: '',
-                                            unitName: '',
-                                            conversionQty: 1,
-                                            quantity: 1,
-                                            unitPrice: 0,
-                                        });
-                                    }}
-                                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-                                >
-                                    <Plus size={15} />
-                                    <span>Add Product</span>
-                                </button>
-                            </div>
-                        )}
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={handleOpenRegisterProductModal}
+                                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                                <Plus size={15} />
+                                New Product
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    append({
+                                        productId: '',
+                                        productUnitId: '',
+                                        name: '',
+                                        unitName: '',
+                                        conversionQty: 1,
+                                        quantity: 1,
+                                        unitPrice: 0,
+                                    });
+                                }}
+                                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                                <Plus size={15} />
+                                <span>Add Product</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-3">
@@ -800,11 +830,7 @@ export const OrderFormPage: React.FC = () => {
                             return (
                                 <div
                                     key={field.id}
-                                    className={`rounded-xl border p-4 transition-all ${
-                                        isEditMode
-                                            ? 'border-slate-200 bg-slate-100/50'
-                                            : 'border-slate-200 bg-slate-50/40'
-                                    }`}
+                                    className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 transition-all"
                                 >
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
                                         {/* Produk */}
@@ -822,7 +848,6 @@ export const OrderFormPage: React.FC = () => {
                                             <div className="relative">
                                                 <input
                                                     type="text"
-                                                    disabled={isEditMode}
                                                     placeholder="Type product name / SKU..."
                                                     value={
                                                         productSearches[
@@ -870,70 +895,73 @@ export const OrderFormPage: React.FC = () => {
                                                         }
                                                     }}
                                                     onFocus={() => {
-                                                        if (!isEditMode)
-                                                            setActiveProductDropdown(
-                                                                index
-                                                            );
+                                                        setActiveProductDropdown(
+                                                            index
+                                                        );
                                                     }}
-                                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
                                                 />
                                                 {watchedItems[index]
-                                                    .productId &&
-                                                    !isEditMode && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                handleClearSelectProduct(
-                                                                    index
-                                                                )
-                                                            }
-                                                            className="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
-                                                    )}
+                                                    ?.productId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleClearSelectProduct(
+                                                                index
+                                                            )
+                                                        }
+                                                        className="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            {!isEditMode &&
-                                                activeProductDropdown ===
-                                                    index && (
-                                                    <div className="absolute left-0 z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                                                        {filteredProducts.length ===
-                                                        0 ? (
-                                                            <div className="px-3 py-2 text-[12px] text-slate-400 text-center">
-                                                                Product not found
-                                                            </div>
-                                                        ) : (
-                                                            filteredProducts.map(
-                                                                (p) => (
-                                                                    <button
-                                                                        key={p.id}
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            handleSelectProduct(
-                                                                                index,
-                                                                                p
-                                                                            )
-                                                                        }
-                                                                        className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-[12px] hover:bg-slate-50 transition-colors"
-                                                                    >
-                                                                        <div>
-                                                                            <div className="font-semibold text-slate-800">
-                                                                                {p.name}
-                                                                            </div>
-                                                                            <div className="text-[11px] text-slate-400 font-mono">
-                                                                                {p.code}
-                                                                            </div>
+                                            {activeProductDropdown ===
+                                                index && (
+                                                <div className="absolute left-0 z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                                                    {filteredProducts.length ===
+                                                    0 ? (
+                                                        <div className="px-3 py-2 text-[12px] text-slate-400 text-center">
+                                                            Product not found
+                                                        </div>
+                                                    ) : (
+                                                        filteredProducts.map(
+                                                            (p) => (
+                                                                <button
+                                                                    key={p.id}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleSelectProduct(
+                                                                            index,
+                                                                            p
+                                                                        )
+                                                                    }
+                                                                    className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-[12px] hover:bg-slate-50 transition-colors"
+                                                                >
+                                                                    <div>
+                                                                        <div className="font-semibold text-slate-800">
+                                                                            {
+                                                                                p.name
+                                                                            }
                                                                         </div>
-                                                                        <span className="text-[12px] text-blue-600 font-medium">
-                                                                            {p.baseUnit}
-                                                                        </span>
-                                                                    </button>
-                                                                )
+                                                                        <div className="text-[11px] text-slate-400 font-mono">
+                                                                            {
+                                                                                p.code
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="text-[12px] text-blue-600 font-medium">
+                                                                        {
+                                                                            p.baseUnit
+                                                                        }
+                                                                    </span>
+                                                                </button>
                                                             )
-                                                        )}
-                                                    </div>
-                                                )}
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Unit Satuan */}
@@ -945,10 +973,7 @@ export const OrderFormPage: React.FC = () => {
                                                 {...register(
                                                     `items.${index}.productUnitId`
                                                 )}
-                                                disabled={
-                                                    isEditMode ||
-                                                    !currentProductId
-                                                }
+                                                disabled={!currentProductId}
                                                 onChange={(e) =>
                                                     handleUnitChange(
                                                         index,
@@ -986,7 +1011,6 @@ export const OrderFormPage: React.FC = () => {
                                             <div className="flex items-center rounded-lg border border-slate-200 bg-white overflow-hidden">
                                                 <button
                                                     type="button"
-                                                    disabled={isEditMode}
                                                     onClick={() =>
                                                         handleQtyChange(
                                                             index,
@@ -999,7 +1023,6 @@ export const OrderFormPage: React.FC = () => {
                                                 </button>
                                                 <input
                                                     type="text"
-                                                    disabled={isEditMode}
                                                     inputMode="numeric"
                                                     value={
                                                         quantity === 0
@@ -1045,7 +1068,6 @@ export const OrderFormPage: React.FC = () => {
                                                 />
                                                 <button
                                                     type="button"
-                                                    disabled={isEditMode}
                                                     onClick={() =>
                                                         handleQtyChange(
                                                             index,
@@ -1071,7 +1093,6 @@ export const OrderFormPage: React.FC = () => {
                                             </div>
 
                                             {(() => {
-                                                // Kalkulasi HPP unit yang sedang aktif dipilih
                                                 const selectedUnitConversion =
                                                     Number(
                                                         watch(
@@ -1085,12 +1106,12 @@ export const OrderFormPage: React.FC = () => {
                                                     ) * selectedUnitConversion;
                                                 const isPriceBelowHpp = Boolean(
                                                     currentProduct &&
-                                                        watch(
-                                                            `items.${index}.productUnitId`
-                                                        ) &&
-                                                        unitPrice > 0 &&
-                                                        unitPrice <=
-                                                            currentSelectedHpp
+                                                    watch(
+                                                        `items.${index}.productUnitId`
+                                                    ) &&
+                                                    unitPrice > 0 &&
+                                                    unitPrice <=
+                                                        currentSelectedHpp
                                                 );
 
                                                 return (
@@ -1100,7 +1121,6 @@ export const OrderFormPage: React.FC = () => {
                                                                 <input
                                                                     type="text"
                                                                     disabled={
-                                                                        isEditMode ||
                                                                         !watch(
                                                                             `items.${index}.productUnitId`
                                                                         )
@@ -1117,12 +1137,9 @@ export const OrderFormPage: React.FC = () => {
                                                                             : ''
                                                                     }
                                                                     onFocus={() => {
-                                                                        if (
-                                                                            !isEditMode
-                                                                        )
-                                                                            setFocusedPriceIndex(
-                                                                                index
-                                                                            );
+                                                                        setFocusedPriceIndex(
+                                                                            index
+                                                                        );
                                                                     }}
                                                                     onBlur={() => {
                                                                         setFocusedPriceIndex(
@@ -1172,17 +1189,21 @@ export const OrderFormPage: React.FC = () => {
                                                                                     Units)
                                                                                 </span>
                                                                                 <span className="text-[9px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                                                                                    Base: {currentProduct.baseUnit}
+                                                                                    Base:{' '}
+                                                                                    {
+                                                                                        currentProduct.baseUnit
+                                                                                    }
                                                                                 </span>
                                                                             </div>
 
                                                                             <div className="space-y-1.5 text-[11px]">
-                                                                                {/* 1. HPP Satuan Dasar (Base Unit) */}
                                                                                 <div className="flex items-center justify-between">
                                                                                     <span className="text-slate-600">
                                                                                         HPP
                                                                                         /{' '}
-                                                                                        {currentProduct.baseUnit}
+                                                                                        {
+                                                                                            currentProduct.baseUnit
+                                                                                        }
                                                                                         :
                                                                                     </span>
                                                                                     <span className="font-bold text-slate-800">
@@ -1195,7 +1216,6 @@ export const OrderFormPage: React.FC = () => {
                                                                                     </span>
                                                                                 </div>
 
-                                                                                {/* 2. HPP Satuan-satuan Turunan Lainnya */}
                                                                                 {(
                                                                                     currentProduct.units ||
                                                                                     []
@@ -1257,6 +1277,7 @@ export const OrderFormPage: React.FC = () => {
                                                                                                             }
                                                                                                             )
                                                                                                         </span>
+
                                                                                                         :
                                                                                                     </span>
                                                                                                     <span className="font-bold shrink-0">
@@ -1280,7 +1301,6 @@ export const OrderFormPage: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        {/* Indikator Validasi Jika Harga <= HPP */}
                                                         {isPriceBelowHpp && (
                                                             <p className="mt-1 text-[11px] font-medium text-rose-600">
                                                                 Harga harus &gt;{' '}
@@ -1298,10 +1318,7 @@ export const OrderFormPage: React.FC = () => {
                                         <div className="sm:col-span-1 flex justify-end">
                                             <button
                                                 type="button"
-                                                disabled={
-                                                    isEditMode ||
-                                                    fields.length === 1
-                                                }
+                                                disabled={fields.length === 1}
                                                 onClick={() => remove(index)}
                                                 className="cursor-pointer p-1.5 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
                                                 title="Hapus Baris"
@@ -1316,7 +1333,7 @@ export const OrderFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* PANEL 3: DELIVERY DETAILS (DELIVERY DATE BISA DIEDIT) */}
+                {/* PANEL 3: DELIVERY DETAILS */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
                     <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
                         <Truck size={16} className="text-blue-600" />
@@ -1324,22 +1341,16 @@ export const OrderFormPage: React.FC = () => {
                     </h2>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {/* 1. Delivery Fee (Terkunci saat Edit) */}
+                        {/* 1. Delivery Fee */}
                         <div>
                             <div className="flex items-center gap-2">
                                 <label className="block text-[12px] font-semibold tracking-wider text-slate-700">
                                     Delivery Fee (Rp)
                                 </label>
-                                {isEditMode && (
-                                    <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                                        <Lock size={11} />
-                                    </span>
-                                )}
                             </div>
                             <div className="relative mt-1.5">
                                 <input
                                     type="text"
-                                    disabled={isEditMode}
                                     inputMode="numeric"
                                     placeholder="0"
                                     value={
@@ -1361,12 +1372,12 @@ export const OrderFormPage: React.FC = () => {
                                             shouldValidate: true,
                                         });
                                     }}
-                                    className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                    className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 shadow-xs focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 />
                             </div>
                         </div>
 
-                        {/* 2. Delivery Date (DAPAT DIEDIT) */}
+                        {/* 2. Delivery Date */}
                         <div>
                             <label className="block text-[12px] font-semibold tracking-wider text-slate-700">
                                 Delivery Due Date
@@ -1375,7 +1386,8 @@ export const OrderFormPage: React.FC = () => {
                                 <input
                                     type="date"
                                     disabled={
-                                        existingOrder?.deliveryStatus === 'SHIPPED'
+                                        existingOrder?.deliveryStatus ===
+                                        'SHIPPED'
                                     }
                                     {...register('deliveryDate')}
                                     className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 shadow-xs disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -1385,11 +1397,10 @@ export const OrderFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* PANEL 4: PAYMENT DATE & NOTES (DAPAT DIEDIT) */}
+                {/* PANEL 4: PAYMENT DATE & NOTES */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div className="space-y-4">
-                            {/* Payment Date / Due Date (DAPAT DIEDIT) */}
                             <div>
                                 <label className="block text-[12px] font-semibold tracking-wider text-slate-700">
                                     Payment Due Date
@@ -1403,7 +1414,6 @@ export const OrderFormPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Order Notes (DAPAT DIEDIT) */}
                             <div>
                                 <label className="block text-[12px] font-semibold tracking-wider text-slate-700">
                                     Order Notes (Optional)
