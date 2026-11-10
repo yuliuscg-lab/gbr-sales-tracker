@@ -218,7 +218,7 @@ export const PaymentsPage: React.FC = () => {
     // State untuk Order Detail Modal
     const [selectedOrderDetail, setSelectedOrderDetail] =
         useState<OrderDetailRecord | null>(null);
-    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const [_isLoadingDetail, setIsLoadingDetail] = useState(false);
 
     const handleOpenOrderDetail = async (
         orderId?: string,

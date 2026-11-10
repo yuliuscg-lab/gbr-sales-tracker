@@ -114,6 +114,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                             name,
                             baseUnit,
                             costPrice,
+                            isProductionItem:true,
                             additionalUnits,
                         },
                     };
