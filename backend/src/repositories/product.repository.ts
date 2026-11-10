@@ -112,6 +112,7 @@ export class ProductRepository {
             code: string;
             name: string;
             baseUnit: string;
+            isProductionItem?:boolean;
             costPrice: number;
             additionalUnits?: { unitName: string; conversionQty: number }[];
         }[]
@@ -134,6 +135,7 @@ export class ProductRepository {
                         code: item.code,
                         name: item.name,
                         baseUnit: item.baseUnit,
+                        isProductionItem: item.isProductionItem,
                         costPrice: item.costPrice,
                         units: {
                             create: unitsData,
