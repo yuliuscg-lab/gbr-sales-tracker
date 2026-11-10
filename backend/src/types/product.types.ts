@@ -14,6 +14,7 @@ export interface CreateProductDTO {
     code: string;
     name: string;
     baseUnit: string;
+    isProductionItem:boolean;
     costPrice?: number;
     additionalUnits?: CreateProductUnitDTO[];
 }
@@ -21,6 +22,7 @@ export interface CreateProductDTO {
 export interface UpdateProductDTO {
     name?: string;
     baseUnit?: string;
+    isProductionItem?:boolean;
     costPrice?: number;
     additionalUnits?: UpdateProductUnitDTO[];
 }

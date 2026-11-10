@@ -20,24 +20,24 @@ model User {
 }
 
 model Customer {
-  id                String                 @id @default(cuid())
+  id                String  @id @default(cuid())
   name              String
   phone             String?
-  totalOrders       Int                    @default(0) @map("total_orders")
-  unpaidOrdersCount Int                    @default(0) @map("unpaid_orders_count")
+  totalOrders       Int     @default(0) @map("total_orders")
+  unpaidOrdersCount Int     @default(0) @map("unpaid_orders_count")
   notes             String?
 
-  address           String?
-  subdistrict       String?
-  district          String?
-  city              String?
-  province          String?
-  mapsUrl           String?                @map("maps_url")
+  address     String?
+  subdistrict String?
+  district    String?
+  city        String?
+  province    String?
+  mapsUrl     String? @map("maps_url")
 
-  customPrices      CustomerProductPrice[]
-  createdAt         DateTime               @default(now()) @map("created_at")
-  updatedAt         DateTime               @updatedAt @map("updated_at")
-  deletedAt         DateTime?              @map("deleted_at")
+  customPrices CustomerProductPrice[]
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  deletedAt    DateTime?              @map("deleted_at")
 
   orders Order[]
 
@@ -46,31 +46,33 @@ model Customer {
 }
 
 model Order {
-  id            String    @id @default(cuid())
-  customer      Customer  @relation(fields: [customerId], references: [id])
-  customerId    String    @map("customer_id")
-  orderNo       String    @unique @map("order_no")
-  deliveryFee   Int       @default(0) @map("delivery_fee")
-  totalAmount   Int       @map("total_amount")
-  paidAmount    Int       @default(0) @map("paid_amount")
-  dueDate       DateTime? @map("due_date")
-  notes         String?
-  deliveryDate  DateTime  @default(now()) @map("delivery_date")
+  id           String    @id @default(cuid())
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  customerId   String    @map("customer_id")
+  orderNo      String    @unique @map("order_no")
+  deliveryFee  Int       @default(0) @map("delivery_fee")
+  totalAmount  Int       @map("total_amount")
+  paidAmount   Int       @default(0) @map("paid_amount")
+  dueDate      DateTime? @map("due_date")
+  notes        String?
+  deliveryDate DateTime  @default(now()) @map("delivery_date")
 
-  shippedAt     DateTime? @map("shipped_at")
-  orderDate     DateTime  @default(now()) @map("order_date")
-  cancelReason  String?   @map("cancel_reason")
-  
-  deliveryStatus DeliveryStatus @default(NOT_SHIPPED) @map("delivery_status")
-  status   OrderStatus @default(UNPAID)
-  items    OrderItem[]
-  payments Payment[]
+  shippedAt    DateTime? @map("shipped_at")
+  orderDate    DateTime  @default(now()) @map("order_date")
+  cancelReason String?   @map("cancel_reason")
+
+  deliveryStatus   DeliveryStatus  @default(NOT_SHIPPED) @map("delivery_status")
+  productionCardId String?         @map("production_card_id")
+  productionCard   ProductionCard? @relation(fields: [productionCardId], references: [id], onDelete: SetNull)
+  status           OrderStatus     @default(UNPAID)
+  items            OrderItem[]
+  payments         Payment[]
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   cancelledAt DateTime? @map("cancelled_at")
-  
-  @@index([deliveryStatus])
+
+  @@index([deliveryStatus, productionCardId])
   @@index([customerId])
   @@index([status])
   @@index([orderNo])
@@ -78,20 +80,22 @@ model Order {
 }
 
 model Product {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  name      String    @unique
-  baseUnit  String
-  costPrice Int @default(0) @map("cost_price")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  id               String    @id @default(cuid())
+  code             String    @unique
+  name             String    @unique
+  baseUnit         String
+  isProductionItem Boolean   @default(true) @map("is_production_item")
+  costPrice        Int       @default(0) @map("cost_price")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
 
   units      ProductUnit[]
   orderItems OrderItem[]
 
   @@index([code])
   @@index([name])
+  @@index([isProductionItem])
   @@index([deletedAt])
   @@map("products")
 }
@@ -135,18 +139,19 @@ model OrderItem {
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   productId String?
 
-  name          String
-  unitName      String
-  quantity      Int
-  conversionQty Int
-  baseQty       Int
-  unitPrice     Int    @map("unit_price")
-  costPrice     Int    @map("cost_price") @default(0)
-  subTotal      Int    @map("sub_total")
+  name             String
+  unitName         String
+  quantity         Int
+  conversionQty    Int
+  baseQty          Int
+  unitPrice        Int    @map("unit_price")
+  costPrice        Int    @default(0) @map("cost_price")
+  subTotal         Int    @map("sub_total")
+  isProductionItem Boolean @default(true) @map("is_production_item")
 
-  @@map("order_items")
   @@index([orderId])
   @@index([productId])
+  @@map("order_items")
 }
 
 model Payment {
@@ -181,18 +186,29 @@ model RefreshToken {
 }
 
 model Expense {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   amount      Int
-  expenseDate DateTime @default(now()) @map("expense_date")
-  type        ExpenseType @map("expense_type") @default(OPERATIONAL)
+  expenseDate DateTime    @default(now()) @map("expense_date")
+  type        ExpenseType @default(OPERATIONAL) @map("expense_type")
   category    String
   note        String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
   @@index([expenseDate])
   @@index([type])
   @@map("expenses")
+}
+
+model ProductionCard {
+  id        String   @id @default(cuid())
+  cardNo    String   @unique @map("card_no")
+  createdAt DateTime @default(now()) @map("created_at")
+  notes     String?
+  orders    Order[]
+
+  @@index([createdAt])
+  @@map("production_cards")
 }
 
 enum OrderStatus {

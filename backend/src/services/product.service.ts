@@ -46,7 +46,8 @@ export class ProductService {
             code,
             name: trimmedName,
             baseUnit: trimmedBaseUnit,
-            costPrice, // <-- Kirim ke repository
+            isProductionItem: Boolean(data.isProductionItem),
+            costPrice,
             additionalUnits: data.additionalUnits,
         });
     }
@@ -125,6 +126,10 @@ export class ProductService {
 
         if (data.additionalUnits !== undefined) {
             updatePayload.additionalUnits = data.additionalUnits;
+        }
+
+        if (data.isProductionItem !== undefined) {
+            updatePayload.isProductionItem = Boolean(data.isProductionItem);
         }
 
         return productRepository.update(id, updatePayload);

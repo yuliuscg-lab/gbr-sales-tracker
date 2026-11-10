@@ -25,10 +25,18 @@ export const createOrderSchema = z.object({
     items: z.array(orderItemSchema).min(1, 'Minimal harus ada 1 item barang yang dipesan'),
 });
 
+export const updateOrderItemSchema = orderItemSchema.extend({
+    productId: z.string().nullable().optional(),
+    productUnitId: z.string().nullable().optional(),
+    unitName: z.string().min(1, 'Pilih satuan (UOM)'),
+});
+
 export const updateOrderSchema = z.object({
     deliveryDate: z.string().optional().nullable(),
     dueDate: z.string().optional().nullable(),
     notes: z.string().optional(),
+    deliveryFee: z.coerce.number().optional(),
+    items: z.array(updateOrderItemSchema).min(1, `Minimal harus ada 1 item barang yang dipesan`).optional()
 });
 
 export type UpdateOrderFormData = z.infer<typeof updateOrderSchema>;

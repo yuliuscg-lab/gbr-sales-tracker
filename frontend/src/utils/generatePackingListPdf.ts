@@ -11,7 +11,7 @@ const formatDate = (dateStr?: string | null) => {
     });
 };
 
-export const downloadProductionCardPdf = (order: OrderRecord) => {
+export const downloadPackingListPdf = (order: OrderRecord) => {
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -26,7 +26,7 @@ export const downloadProductionCardPdf = (order: OrderRecord) => {
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 41, 59);
-    doc.text('KARTU PRODUKSI', 14, 18);
+    doc.text('PACKING LIST', 14, 18);
 
     // Garis Pemisah
     doc.setDrawColor(226, 232, 240);
@@ -91,5 +91,5 @@ export const downloadProductionCardPdf = (order: OrderRecord) => {
     });
 
 
-    doc.save(`Kartu_Produksi_${order.orderNo}.pdf`);
+    doc.save(`Packing_List_${order.orderNo}_${order.customer?.name}.pdf`);
 };

@@ -50,6 +50,7 @@ export class ProductRepository {
             select: {
                 id: true,
                 costPrice: true,
+                isProductionItem:true,
             },
         });
     }
@@ -89,6 +90,7 @@ export class ProductRepository {
                 code: data.code,
                 name: data.name,
                 baseUnit: data.baseUnit,
+                isProductionItem: data.isProductionItem,
                 costPrice: data.costPrice ?? 0,
                 units: {
                     create: unitsData.map((u) => ({
@@ -168,6 +170,7 @@ export class ProductRepository {
                     ...(data.costPrice !== undefined && {
                         costPrice: data.costPrice,
                     }),
+                    ...(data.isProductionItem !== undefined && {isProductionItem:data.isProductionItem}),
                 },
             });
 

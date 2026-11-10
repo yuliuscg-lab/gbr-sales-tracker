@@ -10,6 +10,7 @@ export interface CreateOrderItemDTO {
     unitPrice: number;
     costPrice?: number;
     subTotal: number;
+    isProductionItem: boolean;
 }
 
 export interface CreateOrderDTO {
@@ -30,6 +31,8 @@ export interface UpdateOrderDTO {
     dueDate?: Date | null;
     notes?: string | null;
     deliveryDate?: Date;
+    deliveryFee?: number;
+    items: UpdateOrderItemInput[];
 }
 
 export interface CreateOrderItemInput {
@@ -38,6 +41,16 @@ export interface CreateOrderItemInput {
     name: string;
     unitName: string;
     conversionQty: number;
+    quantity: number;
+    unitPrice: number;
+}
+
+export interface UpdateOrderItemInput {
+    productId?: string | null;
+    productUnitId?: string | null;
+    name: string;
+    unitName: string;
+    conversionQty?: number;
     quantity: number;
     unitPrice: number;
 }

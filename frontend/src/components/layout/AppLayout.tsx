@@ -10,18 +10,21 @@ import {
     X,
     ChevronDown,
     Tag,
-    Receipt
+    Receipt,
+    Factory
 } from 'lucide-react';
 import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth";
 import logoGbr from "../../assets/logo-gbr.png";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { useQueryClient } from "@tanstack/react-query";
 
 
 const NAV_ITEMS = [
     { label: 'Dashboard', path: '/dashboard/summary', icon: LayoutDashboard },
     { label: 'Orders', path: '/orders', icon: ShoppingCart },
+    { label: 'Production', path: '/production', icon: Factory},
     { label: 'Payments', path: '/payments', icon: CreditCard },
     { label: 'Customers', path: '/customers', icon: Users },
     { label: 'Products', path: '/products', icon: Package },
@@ -35,6 +38,7 @@ export const AppLayout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user, logout } = useAuthStore();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const handleLogout = async() => {
         try {
@@ -45,6 +49,12 @@ export const AppLayout: React.FC = () => {
             logout();
             navigate('/login', { replace: true });
         }
+    };
+
+    const handleMenuClick = () => {
+    // Hanya query yang sedang aktif/tampil di halaman saat itu yang akan di-fetch ulang
+        queryClient.invalidateQueries({ refetchType: 'active' });
+        setSidebarOpen(false);
     };
 
     return (
@@ -90,7 +100,7 @@ export const AppLayout: React.FC = () => {
                             <NavLink
                                 key={item.path}
                                 to={item.path}
-                                onClick={() => setSidebarOpen(false)}
+                                onClick={handleMenuClick}
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors ${isActive
                                         ? 'bg-blue-100 text-slate-800 font-semibold'
