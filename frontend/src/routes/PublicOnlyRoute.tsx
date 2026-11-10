@@ -9,7 +9,7 @@ export const PublicOnlyRoute: React.FC = () => {
     }
 
     if(accessToken) {
-        return <Navigate to="/dashboard" replace/>;
+        return <Navigate to="/dashboard/summary" replace/>;
     }
 
     return <Outlet/>;

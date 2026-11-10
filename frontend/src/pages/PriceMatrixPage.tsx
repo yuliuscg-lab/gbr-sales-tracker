@@ -47,8 +47,13 @@ export const PriceMatrixPage: React.FC = () => {
 
     // Otomatis pilih customer pertama jika belum ada yang dipilih
     useEffect(() => {
-        if (!selectedCustomerId && customers.length > 0) {
-            setSelectedCustomerId(customers[0].id);
+        if (customers.length > 0) {
+            const exists = customers.some((c) => c.id === selectedCustomerId);
+            if (!selectedCustomerId || !exists) {
+                setSelectedCustomerId(customers[0].id);
+            }
+        } else if (selectedCustomerId) {
+            setSelectedCustomerId('');
         }
     }, [customers, selectedCustomerId]);
 
@@ -63,17 +68,22 @@ export const PriceMatrixPage: React.FC = () => {
 
     // Sinkronkan data database ke local draft saat data berpindah customer atau selesai fetch
     useEffect(() => {
-        if (matrix.length > 0) {
+        if (matrix && matrix.length > 0) {
             const initialMap: Record<string, string> = {};
             matrix.forEach((prod) => {
-                prod.units.forEach((u) => {
+                prod.units?.forEach((u) => {
                     initialMap[u.productUnitId] =
-                        u.price !== null ? String(u.price) : '';
+                        u.price !== null && u.price !== undefined
+                            ? String(u.price)
+                            : '';
                 });
             });
             setPriceDrafts(initialMap);
         } else {
-            setPriceDrafts({});
+            // Hanya kosongkan jika sebelumnya ada isinya (mencegah infinite loop)
+            setPriceDrafts((prev) =>
+                Object.keys(prev).length > 0 ? {} : prev
+            );
         }
     }, [matrix]);
 
@@ -225,12 +235,10 @@ export const PriceMatrixPage: React.FC = () => {
                         <Users size={28} />
                     </div>
                     <h3 className="text-base font-bold text-slate-800">
-                        Belum Ada Data Pelanggan
+                        No Customer Data Found
                     </h3>
                     <p className="mt-1.5 text-xs text-slate-500 max-w-sm">
-                        Matriks harga kesepakatan diatur khusus per pelanggan.
-                        Silakan daftarkan pelanggan pertama Anda terlebih
-                        dahulu.
+                        Product Prices are set per Customer. Please add new customer data.
                     </p>
                     <button
                         type="button"
@@ -238,7 +246,7 @@ export const PriceMatrixPage: React.FC = () => {
                         className="mt-5 flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
                     >
                         <Plus size={16} />
-                        <span>Tambah Pelanggan Baru</span>
+                        <span>Add New Customer</span>
                     </button>
                 </div>
             ) : (

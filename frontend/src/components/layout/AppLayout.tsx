@@ -72,26 +72,26 @@ export const AppLayout: React.FC = () => {
                 }`}
             >
                 <div className="flex h-16 items-center justify-between border-b border-slate-200 px-6">
-                <div className="flex items-center gap-2">
-                    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg">
-                        <img 
-                            src={logoGbr} 
-                            alt="Logo Gembira" 
-                            className="h-full w-full object-contain" 
-                        />
+                    <div className="flex items-center gap-2">
+                        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg">
+                            <img 
+                                src={logoGbr} 
+                                alt="Logo Gembira" 
+                                className="h-full w-full object-contain" 
+                            />
+                        </div>
+                        <div>
+                            <h1 className="text-sm md:text-md font-bold tracking-wide text-slate-800">GBR Fishing</h1>
+                            <p className="text-[10px] md:text-[12px] text-slate-600 font-medium leading-none">Sales Tracking System</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-sm md:text-md font-bold tracking-wide text-slate-800">GBR Fishing</h1>
-                        <p className="text-[10px] md:text-[12px] text-slate-600 font-medium leading-none">Sales Tracking System</p>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    className="rounded-lg py-1.5 pl-3 text-slate-500 hover:bg-slate-100 lg:hidden hover:cursor-pointer"
-                    onClick={() => setSidebarOpen(false)}
-                >
-                    <X size={20} />
-                </button>
+                    <button
+                        type="button"
+                        className="rounded-lg py-1.5 px-1.5 text-slate-500 hover:bg-slate-100 lg:hidden hover:cursor-pointer"
+                        onClick={() => setSidebarOpen(false)}
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
                 <nav className="flex-1 space-y-1.5 px-3 py-4">
                     {NAV_ITEMS.map((item) => {
