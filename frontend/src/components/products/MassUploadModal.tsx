@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { X, UploadCloud, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, UploadCloud, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, Loader2, Factory, Package } from 'lucide-react';
 import { ProductFormData } from '../../validation/product.validation';
 
 interface MassUploadModalProps {
@@ -29,28 +29,46 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
 
     if (!isOpen) return null;
 
-    // 1. Download Template Excel
+    // 1. Download Template Excel dengan Kolom Item Produksi
     const handleDownloadTemplate = () => {
         const templateData = [
             {
                 'Nama Produk*': 'Kail Carbon Special No. 5',
                 'Satuan Dasar*': 'Pcs',
+                'Item Produksi (YA/TIDAK)': 'TIDAK',
                 'HPP Dasar (Rp)*': 850,
                 'Satuan Tambahan (Format: Nama:Rasio)': 'Pack:10, Dus:200',
             },
             {
-                'Nama Produk*': 'Senar Pancing Monofilament 0.25mm',
-                'Satuan Dasar*': 'Roll',
-                'HPP Dasar (Rp)*': 15000,
-                'Satuan Tambahan (Format: Nama:Rasio)': 'Slop:10',
+                'Nama Produk*': 'Pelet Bandul Spesial 500gr',
+                'Satuan Dasar*': 'Bungkus',
+                'Item Produksi (YA/TIDAK)': 'YA',
+                'HPP Dasar (Rp)*': 7500,
+                'Satuan Tambahan (Format: Nama:Rasio)': 'Slop:10, Bal:50',
             },
         ];
 
         const worksheet = XLSX.utils.json_to_sheet(templateData);
-        worksheet['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 40 }];
+        worksheet['!cols'] = [
+            { wch: 35 },
+            { wch: 15 },
+            { wch: 25 },
+            { wch: 18 },
+            { wch: 40 },
+        ];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Template_Produk');
         XLSX.writeFile(workbook, 'Template_Mass_Upload_Produk.xlsx');
+    };
+
+    // Helper parsing nilai Boolean dari teks Excel
+    const parseBoolean = (val: any): boolean => {
+        if (val === undefined || val === null || val === '') return true; // Default true
+        const str = String(val).trim().toUpperCase();
+        if (str === 'TIDAK' || str === 'NO' || str === 'FALSE' || str === '0') {
+            return false;
+        }
+        return true;
     };
 
     // 2. Parse File Excel
@@ -71,14 +89,23 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                 const rawData = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
 
                 const parsed: ParsedProductRow[] = rawData.map((row) => {
-                    // Cari field secara fleksibel jika ada perbedaan spasi / tanda *
                     const name = (row['Nama Produk*'] || row['Nama Produk'] || row['nama'] || '').toString().trim();
                     const baseUnit = (row['Satuan Dasar*'] || row['Satuan Dasar'] || row['baseUnit'] || 'Pcs').toString().trim();
+                    
+                    // Baca nilai IsProductionItem
+                    const rawIsProd =
+                        row['Item Produksi (YA/TIDAK)'] ??
+                        row['Item Produksi'] ??
+                        row['isProductionItem'] ??
+                        row['Produksi'];
+                    const isProductionItem = parseBoolean(rawIsProd);
+
+                    // Baca HPP dasar
                     const rawCost = row['HPP Dasar (Rp)*'] || row['HPP Dasar'] || row['costPrice'] || 0;
                     const costPrice = Math.max(0, parseInt(String(rawCost).replace(/\D/g, ''), 10) || 0);
-                    const rawAdditional = (row['Satuan Tambahan (Format: Nama:Rasio)'] || row['Satuan Tambahan'] || '').toString().trim();
 
-                    // Parse satuan tambahan (contoh: "Pack:10, Dus:200")
+                    // Baca satuan tambahan (misal: "Dus:200, Pack:10")
+                    const rawAdditional = (row['Satuan Tambahan (Format: Nama:Rasio)'] || row['Satuan Tambahan'] || '').toString().trim();
                     const additionalUnits: { unitName: string; conversionQty: number }[] = [];
                     if (rawAdditional) {
                         const pairs = rawAdditional.split(',');
@@ -96,7 +123,6 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                         }
                     }
 
-                    // Validasi baris
                     let isValid = true;
                     let errorMsg = '';
                     if (!name) {
@@ -113,8 +139,8 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                         data: {
                             name,
                             baseUnit,
+                            isProductionItem,
                             costPrice,
-                            isProductionItem:true,
                             additionalUnits,
                         },
                     };
@@ -158,6 +184,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                         </div>
                         <div>
                             <h3 className="text-base font-bold text-slate-800">Mass Upload Product</h3>
+                            <p className="text-xs text-slate-500">Add products by uploading excel file</p>
                         </div>
                     </div>
                     <button
@@ -172,10 +199,10 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
 
                 {/* Body Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                    {/* Panduan & Tombol Download Template */}
+                    {/* Panduan Download Template */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900">
                         <div>
-                            <p className="font-semibold">Download template untuk memastikan pengisian data produk dengan benar </p>
+                            <p className="font-semibold">Download Format Template Excel</p>
                         </div>
                         <button
                             type="button"
@@ -187,7 +214,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                         </button>
                     </div>
 
-                    {/* Area Pilih File */}
+                    {/* Area Drop / Input File */}
                     {!fileName ? (
                         <div
                             onClick={() => fileInputRef.current?.click()}
@@ -204,8 +231,8 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                                 <UploadCloud size={24} />
                             </div>
                             <div className="space-y-1">
-                                <span className="text-sm font-semibold text-slate-700">Klik untuk memilih berkas Excel</span>
-                                <p className="text-xs text-slate-400">Mendukung file .xlsx, .xls, dan .csv</p>
+                                <span className="text-sm font-semibold text-slate-700">Click to choose excel file</span>
+                                <p className="text-xs text-slate-400">Supporting .xlsx, .xls, and .csv files</p>
                             </div>
                         </div>
                     ) : (
@@ -215,7 +242,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                                 <div>
                                     <p className="text-xs font-semibold text-slate-800">{fileName}</p>
                                     <p className="text-[11px] text-slate-400">
-                                        {parsedRows.length} total baris terdeteksi ({validRows.length} valid)
+                                        {parsedRows.length} total rows detected ({validRows.length} valid)
                                     </p>
                                 </div>
                             </div>
@@ -225,30 +252,29 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                                 disabled={isLoading}
                                 className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
                             >
-                                Ganti File
+                                Change File
                             </button>
                         </div>
                     )}
 
-                    {/* Loading State saat parse */}
                     {isParsing && (
                         <div className="py-8 text-center text-slate-400">
                             <Loader2 size={24} className="mx-auto animate-spin text-blue-600" />
-                            <span className="mt-2 block text-xs">Membaca isi berkas Excel...</span>
+                            <span className="mt-2 block text-xs">Reading file....</span>
                         </div>
                     )}
 
-                    {/* Tabel Preview Produk */}
+                    {/* Preview Table */}
                     {parsedRows.length > 0 && !isParsing && (
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                    Preview Data Produk
+                                    Preview Product Data
                                 </span>
                                 {hasInvalid && (
                                     <div className="flex items-center gap-1 text-[11px] font-medium text-amber-600">
                                         <AlertTriangle size={13} />
-                                        <span>Beberapa baris tidak lengkap dan akan dilewati saat submit</span>
+                                        <span>Some rows are incomplete and will be skipped when submitted</span>
                                     </div>
                                 )}
                             </div>
@@ -259,10 +285,11 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                                         <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                             <tr>
                                                 <th className="w-10 px-3 py-2 text-center">Status</th>
-                                                <th className="px-4 py-2">Nama Produk</th>
-                                                <th className="px-4 py-2">Satuan Dasar</th>
-                                                <th className="px-4 py-2">HPP Modal</th>
-                                                <th className="px-4 py-2">Satuan Tambahan</th>
+                                                <th className="px-4 py-2">Product Name</th>
+                                                <th className="px-3 py-2 text-center">Item Type</th>
+                                                <th className="px-4 py-2">Base Unit</th>
+                                                <th className="px-4 py-2">HPP</th>
+                                                <th className="px-4 py-2">Additional units</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -281,7 +308,20 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-2 font-medium text-slate-800">
-                                                        {row.data.name || <span className="text-rose-500 italic">Kosong</span>}
+                                                        {row.data.name || <span className="text-rose-500 italic">Empty</span>}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-center">
+                                                        {row.data.isProductionItem ? (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                                                                <Factory size={10} />
+                                                                <span>Production</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                                                <Package size={10} />
+                                                                <span>Non-Production</span>
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-2 text-slate-600">{row.data.baseUnit}</td>
                                                     <td className="px-4 py-2 font-mono font-medium text-slate-700">
@@ -316,7 +356,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                 {/* Footer Modal */}
                 <div className="flex items-center justify-between border-t border-slate-100 p-6 pt-4">
                     <span className="text-xs text-slate-500">
-                        {validRows.length} dari {parsedRows.length} data siap didaftarkan
+                        {validRows.length} of {parsedRows.length} ready to be registered
                     </span>
                     <div className="flex items-center gap-2">
                         <button
@@ -325,7 +365,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                             disabled={isLoading}
                             className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                         >
-                            Batal
+                            Cancel
                         </button>
                         <button
                             type="button"
@@ -334,7 +374,7 @@ export const MassUploadModal: React.FC<MassUploadModalProps> = ({
                             className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading && <Loader2 size={13} className="animate-spin" />}
-                            <span>Submit ({validRows.length} Produk)</span>
+                            <span>Submit</span>
                         </button>
                     </div>
                 </div>

@@ -76,6 +76,7 @@ export class ProductService {
             code: `${prefix}${String(startSeq + idx).padStart(4, '0')}`,
             name: item.name.trim(),
             baseUnit: item.baseUnit.trim(),
+            isProductionItem: typeof item.isProductionItem === "boolean" ? item.isProductionItem : true,
             costPrice: Math.max(0, Number(item.costPrice || 0)),
             additionalUnits: item.additionalUnits || [],
         }));
