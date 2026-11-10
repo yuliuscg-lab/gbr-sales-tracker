@@ -440,7 +440,7 @@ export const OrdersPage: React.FC = () => {
         return () => window.removeEventListener('click', handleOutsideClick);
     }, []);
 
-    const [isProcessingImg, setIsProcessingImg] = useState<string | null>(null);
+    const [_isProcessingImg, setIsProcessingImg] = useState<string | null>(null);
 
     return (
         <div className="flex flex-col h-[calc(100vh-8.5rem)] gap-4 sm:gap-6">

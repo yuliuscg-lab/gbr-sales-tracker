@@ -31,14 +31,15 @@ export interface OrderDetailRecord extends OrderRecord {
     deliveryDate?: string;
     cancelReason?: string | null;
     cancelledAt?: string | Date | null;
-    items?: Array<{
+    items?: {
         id: string;
         name: string;
         unitName: string;
         quantity: number;
         unitPrice: number;
         subTotal?: number;
-    }>;
+        isProductionItem:boolean;
+    }[];
     payments?: PaymentHistoryItem[];
     notes?: string | null;
 }
